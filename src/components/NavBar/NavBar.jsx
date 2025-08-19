@@ -18,10 +18,12 @@ export default function Navbar() {
   return (
     // Main navigation bar with a subtle gradient and a clean, modern shadow.
     <nav className="relative bg-white p-4 shadow-lg font-sans">
-      <div className="container mx-auto flex justify-between items-center">
-        {/* The app name as a link to the home page. */}
-        <Link to="/" className="text-2xl font-extrabold text-green-800 tracking-wide hover:text-green-600 transition-colors duration-200">
-          Sandhai
+      {/* The logo and links are now within a container with controlled padding to keep the logo at the far left. */}
+      <div className="max-w-7xl mx-auto px-4 flex justify-between items-center">
+        {/* The app name with a logo as a link to the home page. */}
+        <Link to="/" className="text-2xl font-extrabold text-green-800 tracking-wide hover:text-green-600 transition-colors duration-200 flex items-center space-x-2">
+          <span className="text-4xl">🌱</span>
+          <span>Sandhai</span>
         </Link>
 
         {/* Mobile menu toggle button. Hidden on medium and larger screens. */}
