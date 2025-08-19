@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Filter, MapPin, Star, Wrench, CalendarDays, Leaf } from 'lucide-react';
-import Navbar from '../NavBar/Navbar';
+import Navbar from '../NavBar/NavBar';
 import { useNavigate } from 'react-router-dom';
 
 const RentalPage = () => {
