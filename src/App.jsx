@@ -6,8 +6,8 @@ import LoginForm from './components/LoginForm/LoginForm';
 import ProductList from './components/Productdisplay/ProductList'
 import RentalPage from './components/Rental/RentalPage'
 import Navbar from './components/NavBar/NavBar';
-import AddProduct from './components/AddProducts/AddProducts';
-import AddRentalProduct from './components/AddRentalProduct/AddRentalProduct';
+import AddProduct from './components/Productdisplay/AddProducts';
+import AddRentalProduct from './components/Rental/AddRentalProduct';
 function App() {
   return (
 
