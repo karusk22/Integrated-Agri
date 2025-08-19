@@ -18,7 +18,8 @@ export default function SignUpForm() {
     phone: '',
     password: '',
     confirmPassword: '',
-    userRole: 'farmer', // Default role is 'farmer'
+    // userRole is now an array to support multiple selections
+    userRole: ['farmer'], 
     location: '',
   });
 
@@ -29,6 +30,24 @@ export default function SignUpForm() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  // Handler for role card clicks
+  const handleRoleClick = (roleValue) => {
+    setFormData(prev => {
+      // Check if the role is already selected
+      const isSelected = prev.userRole.includes(roleValue);
+      let newRoles = [...prev.userRole];
+
+      if (isSelected) {
+        // Remove the role from the array
+        newRoles = newRoles.filter(role => role !== roleValue);
+      } else {
+        // Add the role to the array
+        newRoles.push(roleValue);
+      }
+      return { ...prev, userRole: newRoles };
+    });
   };
 
   // Handles the form submission logic.
@@ -71,15 +90,14 @@ export default function SignUpForm() {
 
   const roles = [
     { value: 'farmer', label: 'Farmer', emoji: '🧑‍🌾' },
-    { value: 'buyer', label: 'Buyer', emoji: '🛍️' },
     { value: 'equipment-owner', label: 'Equipment Owner', emoji: '🚜' },
   ];
 
   return (
     // Main container for the form with a subtle background and centered layout.
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
+    <div className="min-h-screen bg-slate-100 flex items-center justify-start pt-16 pb-16 font-sans">
       {/* Form container with card-like styling, using a subtle shadow and rounded corners. */}
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+      <div className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-md mx-auto">
         {/* Header section of the form with a themed icon. */}
         <div className="text-center mb-6">
           <div className="text-4xl mb-4">🌱</div>
@@ -92,9 +110,9 @@ export default function SignUpForm() {
         </div>
 
         {/* The sign-up form itself. */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit}>
           {/* Full Name input field. */}
-          <div>
+          <div className="mb-4">
             <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="fullName">
               Full Name
             </label>
@@ -111,7 +129,7 @@ export default function SignUpForm() {
           </div>
 
           {/* Email input field. */}
-          <div>
+          <div className="mb-4">
             <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="email">
               Email Address
             </label>
@@ -128,7 +146,7 @@ export default function SignUpForm() {
           </div>
 
           {/* Phone Number input field. */}
-          <div>
+          <div className="mb-4">
             <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="phone">
               Phone Number
             </label>
@@ -145,7 +163,7 @@ export default function SignUpForm() {
           </div>
           
           {/* Password input field. */}
-          <div>
+          <div className="mb-4">
             <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="password">
               Password
             </label>
@@ -162,7 +180,7 @@ export default function SignUpForm() {
           </div>
 
           {/* Confirm Password input field. */}
-          <div>
+          <div className="mb-4">
             <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="confirmPassword">
               Confirm Password
             </label>
@@ -179,19 +197,19 @@ export default function SignUpForm() {
           </div>
           
           {/* User Role selection using clickable cards. */}
-          <div>
+          <div className="mb-6">
             <label className="block text-gray-700 text-sm font-semibold mb-2">
               I am a...
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               {roles.map((role) => (
                 <div
                   key={role.value}
-                  onClick={() => setFormData(prev => ({ ...prev, userRole: role.value }))}
+                  onClick={() => handleRoleClick(role.value)}
                   className={`
                     flex flex-col items-center justify-center p-4 rounded-lg
                     border-2 cursor-pointer transition-all duration-200
-                    ${formData.userRole === role.value ? 
+                    ${formData.userRole.includes(role.value) ? 
                       'border-green-600 bg-green-50 shadow-md' : 
                       'border-gray-300 hover:border-green-400'
                     }
@@ -205,7 +223,7 @@ export default function SignUpForm() {
           </div>
 
           {/* Location input field. */}
-          <div>
+          <div className="mb-6">
             <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="location">
               Location (City/State)
             </label>
