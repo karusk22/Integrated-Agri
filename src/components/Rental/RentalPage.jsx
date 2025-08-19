@@ -154,7 +154,7 @@ const RentalPage = () => {
                         </div>
                     </div>
                     <h1 className="text-5xl md:text-7xl font-black bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent leading-tight mb-4">
-                        AgriMachinery Rentals
+                        Sandhai Rentals
                     </h1>
                     <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
                         Rent the right farm equipment for your needs.
@@ -238,10 +238,10 @@ const RentalPage = () => {
                         <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center mr-3">
                             <Leaf size={20} className="text-white" />
                         </div>
-                        <span className="text-2xl font-bold text-gray-700">AgriBazar</span>
+                        <span className="text-2xl font-bold text-gray-700">Sandhai Rentals</span>
                     </div>
                     <p className="text-gray-500">
-                        Part of the Integrated Agri-Management Platform • Building a sustainable future together
+                        Part of the Sandhai • Building a sustainable future together
                     </p>
                 </footer>
             </div>

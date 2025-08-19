@@ -43,14 +43,14 @@ export default function LoginForm() {
   };
 
   return (
-    // Main container for the form with a subtle background and centered layout.
-    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans">
+    // Main container for the form with a vibrant, themed background.
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 flex items-center justify-center p-4 font-sans">
       {/* Form container with card-like styling, using a subtle shadow and rounded corners. */}
-      <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+      <div className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-md">
         {/* Header section of the form with a themed icon. */}
         <div className="text-center mb-6">
-          <div className="text-4xl mb-4">🌱</div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-green-800 tracking-tight mb-2">
+          <div className="text-4xl mb-4 text-green-800">🌱</div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent tracking-tight mb-2">
             Welcome Back
           </h1>
           <p className="text-gray-600 text-sm sm:text-base">
@@ -59,7 +59,7 @@ export default function LoginForm() {
         </div>
 
         {/* The login form itself. */}
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Email input field. */}
           <div>
             <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="email">
@@ -102,7 +102,7 @@ export default function LoginForm() {
           {/* Submit button with loading state. */}
           <button
             type="submit"
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:bg-green-400 disabled:cursor-not-allowed"
+            className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold py-3 px-4 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 hover:from-emerald-600 hover:to-teal-700 focus:outline-none disabled:bg-gray-400 disabled:cursor-not-allowed"
             disabled={loading}
           >
             {loading ? (
