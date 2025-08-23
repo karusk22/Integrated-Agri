@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../NavBar/NavBar';
+import tractorPic from '../../assets/background/tractor-pic-1.jpg';
+import foodWaste from '../../assets/background/food-waste-1.jpg';
 
 // The main HomePage component, now with an updated theme and more content.
 export default function HomePage() {
@@ -28,7 +30,7 @@ export default function HomePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-24 mb-16">
             {/* Card for By-products */}
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden transform hover:scale-105 transition-transform duration-300">
-                <img src="https://placehold.co/800x600/6A8E4E/ffffff?text=FOOD+WASTE" alt="Pile of organic by-products" className="w-full h-80 object-cover" />
+                <img src={foodWaste} alt="Pile of organic by-products" className="w-full h-80 object-cover" />
                 <div className="p-8">
                 <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">Re-imagining By-products</h3>
                 <p className="text-gray-600 leading-relaxed">
@@ -42,7 +44,7 @@ export default function HomePage() {
 
             {/* Card for Equipment Rentals */}
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden transform hover:scale-105 transition-transform duration-300">
-                <img src="https://placehold.co/800x600/436b1f/ffffff?text=TRACTOR+IN+FIELD" alt="Tractor harvesting crops" className="w-full h-80 object-cover" />
+                <img src={tractorPic} alt="Tractor harvesting crops" className="w-full h-80 object-cover" />
                 <div className="p-8">
                 <h3 className="text-2xl font-bold mb-4 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">Empowering with Equipment</h3>
                 <p className="text-gray-600 leading-relaxed">
