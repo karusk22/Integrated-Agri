@@ -3,13 +3,20 @@ import { Link } from 'react-router-dom';
 import Navbar from '../NavBar/NavBar';
 import tractorPic from '../../assets/background/tractor-pic-1.jpg';
 import foodWaste from '../../assets/background/food-waste-1.jpg';
+import ChatBotMenu from '../ChatBot/ChatBotMenu';
+import chatboticon from '../../assets/background/icons8-chatbot3-48.png';
 
 // The main HomePage component, now with an updated theme and more content.
 export default function HomePage() {
   return (
     <>
         <Navbar/>
-        <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 font-sans text-gray-800">
+        <div className='fixed right-5 bottom-20 max-md:bottom-10 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 py-2 px-5 rounded-3xl z-20'>
+            <Link to="/chatbot">
+                <img src={chatboticon} alt="" className=''/>
+            </Link>
+        </div>
+        <div className="font-sans text-gray-800">
         {/* Hero Section */}
         <div className="relative h-[500px] flex flex-col items-center justify-center p-6 md:p-12">
             <div className="relative z-10 text-center">
@@ -62,17 +69,17 @@ export default function HomePage() {
             <h3 className="text-center text-4xl font-extrabold mb-8 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">How It Works</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="bg-white p-8 rounded-2xl shadow-xl text-center">
-                <div className="text-5xl mb-4 text-emerald-600">1.</div>
+                <div className="text-5xl mb-4 text-emerald-600">1</div>
                 <h4 className="text-xl font-bold mb-2">Create Your Profile</h4>
                 <p className="text-gray-600">Set up your account as a Farmer or an Equipment Owner and list your products or machinery.</p>
                 </div>
                 <div className="bg-white p-8 rounded-2xl shadow-xl text-center">
-                <div className="text-5xl mb-4 text-teal-600">2.</div>
+                <div className="text-5xl mb-4 text-teal-600">2</div>
                 <h4 className="text-xl font-bold mb-2">Connect & Trade</h4>
                 <p className="text-gray-600">Browse listings, connect with other users, and negotiate deals directly through the platform.</p>
                 </div>
                 <div className="bg-white p-8 rounded-2xl shadow-xl text-center">
-                <div className="text-5xl mb-4 text-cyan-600">3.</div>
+                <div className="text-5xl mb-4 text-cyan-600">3</div>
                 <h4 className="text-xl font-bold mb-2">Transact Securely</h4>
                 <p className="text-gray-600">Use our integrated payment and notification system for smooth and secure transactions.</p>
                 </div>

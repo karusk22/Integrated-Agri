@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-
+import logo from '../../assets/background/Sandhai-Logo.png'
 /**
  * Navbar component for the Sandhai application.
  *
@@ -17,7 +17,7 @@ export default function Navbar() {
 
   return (
     // Main navigation bar, now with a background color that matches the homepage.
-    <nav className="relative bg-emerald-50 p-4 shadow-lg font-sans">
+    <nav className="relative p-4 shadow-lg font-sans">
       <div className="max-w-7xl mx-auto px-4 flex justify-between items-center">
         {/* The app name with a logo as a link to the home page. */}
         <Link to="/" className="text-2xl font-extrabold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent tracking-wide flex items-center space-x-2">
@@ -66,9 +66,10 @@ export default function Navbar() {
       {/* Mobile menu that slides down. Hidden on desktop. */}
       <div 
         className={`md:hidden absolute top-full left-0 w-full bg-white shadow-xl 
-                   transition-all duration-300 ease-in-out z-10 overflow-hidden
-                   ${isOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'}`}
+                   transition-all duration-300 ease-in-out z-20 overflow-hidden
+                   ${isOpen ? 'max-h-screen' : 'max-h-0'}`}
       >
+        <div className={`${isOpen ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}>
         <div className="flex flex-col space-y-4 p-4">
           <Link 
             to="/products" 
@@ -91,6 +92,7 @@ export default function Navbar() {
           >
             Login
           </Link>
+        </div>
         </div>
       </div>
     </nav>

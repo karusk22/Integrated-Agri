@@ -8,6 +8,7 @@ import RentalPage from './components/Rental/RentalPage'
 import Navbar from './components/NavBar/NavBar';
 import AddProduct from './components/Productdisplay/AddProducts';
 import AddRentalProduct from './components/Rental/AddRentalProduct';
+import ChatBotMenu from './components/ChatBot/ChatBotMenu';
 function App() {
   return (
 
@@ -21,6 +22,7 @@ function App() {
           <Route path="/rental" element={<RentalPage />} />
           <Route path="/addproduct" element={<AddProduct />} />
           <Route path="/addrentalproduct" element={<AddRentalProduct />} />
+          <Route path="/chatbot" element={<ChatBotMenu />} />
 
 
 

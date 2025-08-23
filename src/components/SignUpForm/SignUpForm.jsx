@@ -95,7 +95,7 @@ export default function SignUpForm() {
 
   return (
     // Main container for the form with a vibrant, themed background.
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 flex items-center justify-start pt-16 pb-16 font-sans">
+    <div className="min-h-screen flex items-center justify-start pt-16 pb-16 font-sans">
       {/* Form container with card-like styling, using a subtle shadow and rounded corners. */}
       <div className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-md mx-auto">
         {/* Header section of the form with a themed icon. */}
