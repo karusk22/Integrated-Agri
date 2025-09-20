@@ -9,6 +9,7 @@ import Navbar from './components/NavBar/NavBar';
 import AddProduct from './components/Productdisplay/AddProducts';
 import AddRentalProduct from './components/Rental/AddRentalProduct';
 import ChatBotMenu from './components/ChatBot/ChatBotMenu';
+import CartPage from './components/Cart/CartPage';
 function App() {
   return (
 
@@ -23,7 +24,7 @@ function App() {
           <Route path="/addproduct" element={<AddProduct />} />
           <Route path="/addrentalproduct" element={<AddRentalProduct />} />
           <Route path="/chatbot" element={<ChatBotMenu />} />
-
+          <Route path="/cartpage" element={<CartPage />} />
 
 
 

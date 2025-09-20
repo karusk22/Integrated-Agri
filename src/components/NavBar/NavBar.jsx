@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import logo from '../../assets/background/Sandhai-Logo.png'
+import { ShoppingCart } from 'lucide-react'; // ⬅️ Added ShoppingCart icon
+import logo from '../../assets/background/Sandhai-Logo.png';
+
 /**
  * Navbar component for the Sandhai application.
  *
@@ -54,6 +56,14 @@ export default function Navbar() {
           >
             Rental
           </Link>
+          {/* ⬅️ ADDED: Cart link for desktop */}
+          <Link 
+            to="/cartpage" 
+            className="relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-0 hover:after:w-full after:bg-green-600 after:transition-all after:duration-300 text-gray-700 hover:text-green-600 transition-colors duration-200 text-lg font-medium flex items-center space-x-1"
+          >
+            <ShoppingCart size={20} className="text-emerald-600" />
+            <span>Cart</span>
+          </Link>
           <Link 
             to="/login" 
             className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-2 rounded-full font-bold shadow-lg transform hover:scale-105 transition-all duration-300 hover:shadow-2xl"
@@ -84,6 +94,14 @@ export default function Navbar() {
             className="block text-gray-700 hover:text-green-600 text-lg font-medium py-2"
           >
             Rental
+          </Link>
+          {/* ⬅️ ADDED: Cart link for mobile */}
+          <Link 
+            to="/cartpage" 
+            onClick={toggleMenu}
+            className="block text-gray-700 hover:text-green-600 text-lg font-medium py-2"
+          >
+            Cart
           </Link>
           <Link 
             to="/login" 
