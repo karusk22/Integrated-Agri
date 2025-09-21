@@ -1,17 +1,22 @@
 import React, { useState } from 'react';
-import { PlusCircle, Image, MapPin, Tag, DollarSign, Package, AlignJustify } from 'lucide-react';
-import Navbar from '../NavBar/NavBar'; // Assuming the path is correct
+import { PlusCircle, Image, MapPin, Tag, Package, AlignJustify } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
-const AddProduct = () => {
+const AddProduct = ({ onAddProduct, user }) => { // ⬅️ Passed onAddProduct and user props
+  const navigate = useNavigate();
+
   const [product, setProduct] = useState({
     name: '',
     description: '',
-    image: null,
-    location: '',
+    locationName: '', // Changed to locationName to match backend
     quantity: '',
+    unit: 'kg', // Added unit selection
     price: '',
-    tags: '',
+    images: null,
   });
+
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -24,25 +29,69 @@ const AddProduct = () => {
   const handleImageChange = (e) => {
     setProduct((prevProduct) => ({
       ...prevProduct,
-      image: e.target.files[0],
+      images: e.target.files[0],
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('New product to be added:', product);
-    // Here you would add the logic to send this data to your backend API
-    // For example:
-    // axios.post('/api/products', product)
-    //   .then(response => console.log('Product added successfully!', response))
-    //   .catch(error => console.error('Error adding product:', error));
-    alert('Product form submitted! Check the console for the data.');
-  };
+    setLoading(true);
+    setMessage('');
 
+    if (!user) {
+      setMessage('You must be logged in to add a product.');
+      setLoading(false);
+      return;
+    }
+
+    const dataToSubmit = new FormData();
+    dataToSubmit.append('name', product.name);
+    dataToSubmit.append('description', product.description);
+    dataToSubmit.append('quantity', product.quantity);
+    dataToSubmit.append('unit', product.unit);
+    dataToSubmit.append('price', product.price);
+    dataToSubmit.append('seller_id', user.user_id);
+    dataToSubmit.append('locationName', product.locationName);
+    
+    if (product.images) {
+      dataToSubmit.append('images', product.images);
+    }
+    
+    try {
+      // Assuming your backend handles the file upload and creates the URL
+      const response = await fetch('http://localhost:3001/api/products', {
+        method: 'POST',
+        body: dataToSubmit, // Browser will set Content-Type to multipart/form-data
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setMessage('Product added successfully!');
+        // Call the parent component's handler to refresh data
+        onAddProduct(result);
+        setProduct({
+          name: '',
+          description: '',
+          locationName: '',
+          quantity: '',
+          unit: 'kg',
+          price: '',
+          images: null,
+        });
+      } else {
+        setMessage(result.message || 'Failed to add product. Please check your data.');
+      }
+    } catch (error) {
+      console.error('Network error:', error);
+      setMessage('An error occurred. Please check your network connection.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   return (
     <div className="min-h-screen">
-      <Navbar />
-    
       <div className="relative z-10 p-8 flex justify-center items-center">
         <div className="w-full max-w-4xl bg-white/80 backdrop-blur-lg rounded-3xl p-8 md:p-12 shadow-2xl border border-white/20">
           <header className="text-center mb-8">
@@ -78,17 +127,17 @@ const AddProduct = () => {
               <div className="relative">
                 <input
                   type="text"
-                  name="location"
-                  id="location"
+                  name="locationName"
+                  id="locationName"
                   placeholder="Location (e.g., Coimbatore, Tamil Nadu)"
-                  value={product.location}
+                  value={product.locationName}
                   onChange={handleChange}
                   required
                   className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400"
                 />
                 <MapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
               </div>
-
+              
               {/* Price */}
               <div className="relative">
                 <input
@@ -101,38 +150,45 @@ const AddProduct = () => {
                   required
                   className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400"
                 />
-                <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 font-bold text-xl">₹</span>
               </div>
 
-              {/* Quantity */}
-              <div className="relative">
-                <input
-                  type="text"
-                  name="quantity"
-                  id="quantity"
-                  placeholder="Quantity (e.g., 500 kg)"
-                  value={product.quantity}
-                  onChange={handleChange}
-                  required
-                  className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400"
-                />
-                <Package className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              {/* Quantity and Unit */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="relative">
+                  <input
+                    type="number"
+                    name="quantity"
+                    id="quantity"
+                    placeholder="Quantity"
+                    value={product.quantity}
+                    onChange={handleChange}
+                    required
+                    className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400"
+                  />
+                  <Package className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                </div>
+                <div className="relative">
+                  <select
+                    name="unit"
+                    id="unit"
+                    value={product.unit}
+                    onChange={handleChange}
+                    required
+                    className="w-full pl-4 pr-12 py-4 rounded-2xl border border-gray-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 outline-none transition-all duration-300 text-gray-700 appearance-none"
+                  >
+                    <option value="kg">kg</option>
+                    <option value="tons">tons</option>
+                    <option value="bales">bales</option>
+                    <option value="liters">liters</option>
+                  </select>
+                  <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-400">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </div>
+                </div>
               </div>
-            </div>
-
-            {/* Tags */}
-            <div className="relative">
-              <input
-                type="text"
-                name="tags"
-                id="tags"
-                placeholder="Tags (e.g., Organic, Fertilizer, Biofuel)"
-                value={product.tags}
-                onChange={handleChange}
-                required
-                className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400"
-              />
-              <Tag className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
             </div>
 
             {/* Product Description */}
@@ -154,8 +210,8 @@ const AddProduct = () => {
             <div className="relative p-6 bg-white/70 border border-dashed border-gray-300 rounded-2xl text-center cursor-pointer hover:border-emerald-400 transition-colors duration-300">
               <input
                 type="file"
-                name="image"
-                id="image"
+                name="images"
+                id="images"
                 onChange={handleImageChange}
                 accept="image/*"
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -164,16 +220,24 @@ const AddProduct = () => {
                 <Image size={32} className="text-gray-400 mb-2" />
                 <p className="text-gray-600 font-semibold">Click to upload image</p>
                 <p className="text-gray-500 text-sm mt-1">PNG, JPG up to 10MB</p>
+                {product.images && <p className="text-emerald-500 text-sm mt-2 font-medium">Selected file: {product.images.name}</p>}
               </div>
             </div>
+
+            {message && (
+                <p className={`text-center font-medium ${message.includes('successfully') ? 'text-green-600' : 'text-red-500'}`}>
+                {message}
+                </p>
+            )}
 
             {/* Buttons */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
               <button
                 type="submit"
-                className="w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl hover:from-emerald-600 hover:to-teal-700 transform hover:scale-105 transition-all duration-300"
+                className="w-full sm:w-auto bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl hover:from-emerald-600 hover:to-teal-700 transform hover:scale-105 transition-all duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                disabled={loading}
               >
-                Add Product
+                {loading ? 'Adding...' : 'Add Product'}
               </button>
               <button
                 type="button"
@@ -181,11 +245,11 @@ const AddProduct = () => {
                 onClick={() => setProduct({
                   name: '',
                   description: '',
-                  image: null,
-                  location: '',
+                  locationName: '',
                   quantity: '',
+                  unit: 'kg',
                   price: '',
-                  tags: '',
+                  images: null,
                 })}
               >
                 Cancel

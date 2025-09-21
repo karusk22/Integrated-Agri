@@ -1,52 +1,53 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-// The main App component which renders the login form.
-export default function LoginForm() {
-  // Initialize the navigate hook for programmatic navigation.
+export default function LoginForm({ onLoginSuccess }) {
   const navigate = useNavigate();
-  
-  // State hooks to manage form input values.
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  // Handles the form submission logic.
   const handleSubmit = async (e) => {
-    e.preventDefault(); // Prevent default form submission behavior
+    e.preventDefault();
     setLoading(true);
     setMessage('');
 
-    // Prepare the data to be sent to the backend.
-    const credentials = { email, password };
+    try {
+      const response = await fetch('http://localhost:3001/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
-    // Simulate an API call to your backend for authentication.
-    console.log('Attempting to log in with:', credentials);
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API delay
+      const result = await response.json();
 
-    // For demonstration, we'll assume the login was successful.
-    // In a real app, you would handle the response from your backend.
-    if (email === 'user@example.com' && password === 'password') {
-      
-      // Navigate to the homepage after a short delay.
-      setTimeout(() => {
-        navigate('/');
-        window.scrollTo(0, 0); // Scroll to the top of the page after navigation
-      }, 0);
+      if (response.ok) {
+        setMessage('Login successful! Redirecting...');
 
-    } else {
-      setMessage('Invalid email or password.');
+        // Call App handler to store user
+        if (onLoginSuccess) {
+          onLoginSuccess(result.user); // backend should return { user }
+        }
+
+        setTimeout(() => {
+          navigate('/');
+          window.scrollTo(0, 0);
+        }, 1000);
+      } else {
+        setMessage(result.message || 'Login failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('Network error:', error);
+      setMessage('An error occurred. Please check your network connection.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
-    // Main container for the form with a vibrant, themed background.
     <div className="min-h-screen flex items-center justify-center p-4 font-sans">
-      {/* Form container with card-like styling, using a subtle shadow and rounded corners. */}
       <div className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-md">
-        {/* Header section of the form with a themed icon. */}
         <div className="text-center mb-6">
           <div className="text-4xl mb-4 text-green-800">🌱</div>
           <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent tracking-tight mb-2">
@@ -57,9 +58,7 @@ export default function LoginForm() {
           </p>
         </div>
 
-        {/* The login form itself. */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Email input field. */}
           <div>
             <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="email">
               Email Address
@@ -75,7 +74,6 @@ export default function LoginForm() {
             />
           </div>
 
-          {/* Password input field. */}
           <div>
             <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="password">
               Password
@@ -90,15 +88,13 @@ export default function LoginForm() {
               required
             />
           </div>
-          
-          {/* Message display area for success or errors. */}
+
           {message && (
             <p className={`text-center font-medium ${message.includes('successful') ? 'text-green-600' : 'text-red-500'}`}>
               {message}
             </p>
           )}
 
-          {/* Submit button with loading state. */}
           <button
             type="submit"
             className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold py-3 px-4 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 hover:from-emerald-600 hover:to-teal-700 focus:outline-none disabled:bg-gray-400 disabled:cursor-not-allowed"
@@ -115,7 +111,6 @@ export default function LoginForm() {
           </button>
         </form>
 
-        {/* Optional footer for account creation. */}
         <p className="mt-6 text-center text-gray-500 text-sm">
           Don't have an account? <Link to="/signup" className="text-green-600 hover:underline font-semibold">Sign up</Link>
         </p>

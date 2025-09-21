@@ -40,7 +40,6 @@ const AddRentalProduct = () => {
 
   return (
     <div className="min-h-screen">
-      <Navbar />
     
       <div className="relative z-10 p-8 flex justify-center items-center">
         <div className="w-full max-w-4xl bg-white/80 backdrop-blur-lg rounded-3xl p-8 md:p-12 shadow-2xl border border-white/20">

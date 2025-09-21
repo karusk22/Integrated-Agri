@@ -140,7 +140,6 @@ const RentalPage = () => {
 
     return (
         <div className="min-h-screen">
-            <Navbar />
             <div className="relative z-10 p-8">
                 <header className="text-center mb-16">
                     <div className="mb-6">

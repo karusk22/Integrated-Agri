@@ -10,7 +10,6 @@ import chatboticon from '../../assets/background/icons8-chatbot3-48.png';
 export default function HomePage() {
   return (
     <>
-        <Navbar/>
         <div className='fixed right-5 bottom-20 max-md:bottom-10 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 py-2 px-5 rounded-3xl z-20'>
             <Link to="/chatbot">
                 <img src={chatboticon} alt="" className=''/>

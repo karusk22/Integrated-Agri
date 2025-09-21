@@ -1,17 +1,33 @@
 import React, { useState } from 'react';
-import { Star, MapPin, Award, Package } from 'lucide-react';
+import { Star, MapPin, Award, Package, Image, ShoppingCart } from 'lucide-react';
 
 /**
  * ProductCard Component
  * Enhanced with beautiful animations and modern design
  */
-const ProductCard = ({ product }) => {
+const ProductCard = ({ product, onAddToCart }) => {
     // Add a check to handle cases where the product prop is undefined
     if (!product) {
         return null;
     }
 
     const [isHovered, setIsHovered] = useState(false);
+    const [itemQuantity, setItemQuantity] = useState(1); // ⬅️ New state for quantity to add
+
+    // Helper function to get the first image URL from the array
+    const getProductImage = () => {
+        if (product.images && product.images.length > 0) {
+            // Correctly form a full URL for the image
+            return `http://localhost:3001${product.images[0]}`;
+        }
+        return 'https://placehold.co/600x400/E5E7EB/4B5563?text=No+Image';
+    };
+
+    const handleQuantityChange = (e) => {
+        // Ensure the value is a number and is not less than 1
+        const value = Math.max(1, parseInt(e.target.value, 10));
+        setItemQuantity(value);
+    };
 
     return (
         <div 
@@ -23,7 +39,7 @@ const ProductCard = ({ product }) => {
             <div className="relative h-64 overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-green-400/20 to-blue-600/20 z-10"></div>
                 <img
-                    src={product.image}
+                    src={getProductImage()}
                     alt={product.name}
                     className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700 ease-out"
                 />
@@ -31,7 +47,7 @@ const ProductCard = ({ product }) => {
                 {/* Price Badge */}
                 <div className="absolute top-4 right-4 z-20">
                     <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-bold px-4 py-2 rounded-full shadow-lg backdrop-blur-sm">
-                        ₹{product.price}/kg
+                        ₹{product.price}/{product.unit}
                     </div>
                 </div>
 
@@ -46,8 +62,9 @@ const ProductCard = ({ product }) => {
                 {/* Hover Overlay */}
                 <div className={`absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent z-20 transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
                     <div className="absolute bottom-4 left-4 right-4 text-white">
-                        <button className="w-full bg-white/20 backdrop-blur-md border border-white/30 text-white font-semibold py-3 rounded-xl hover:bg-white/30 transition-all duration-300">
-                            Quick View
+                        <button className="w-full bg-white/20 backdrop-blur-md border border-white/30 text-white font-semibold py-3 rounded-xl hover:bg-white/30 transition-all duration-300"
+                                onClick={() => onAddToCart(product, itemQuantity)}>
+                            Add to Cart
                         </button>
                     </div>
                 </div>
@@ -63,7 +80,7 @@ const ProductCard = ({ product }) => {
                 {/* Location */}
                 <div className="flex items-center text-gray-500 mb-3">
                     <MapPin size={14} className="mr-2 text-emerald-500" />
-                    <span className="text-sm">{product.location}</span>
+                    <span className="text-sm">{product.location_name}</span>
                 </div>
 
                 {/* Rating */}
@@ -88,7 +105,7 @@ const ProductCard = ({ product }) => {
 
                 {/* Tags */}
                 <div className="flex flex-wrap gap-2 mb-4">
-                    {product.tags.map((tag, i) => (
+                    {product.tags && product.tags.map((tag, i) => (
                         <span
                             key={i}
                             className="bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 px-3 py-1 text-xs font-semibold rounded-full border border-emerald-200"
@@ -100,13 +117,26 @@ const ProductCard = ({ product }) => {
 
                 {/* Quantity and Action */}
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                    <div className="flex items-center text-gray-700">
+                    <div className="flex items-center text-gray-700 text-sm">
                         <Package size={16} className="mr-2 text-emerald-500" />
-                        <span className="font-bold text-lg">{product.quantity}</span>
+                        <span>Available: <span className="font-bold">{product.quantity}</span> {product.unit}</span>
                     </div>
-                    <button className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-2 rounded-full font-semibold shadow-lg hover:shadow-xl hover:from-emerald-600 hover:to-teal-700 transform hover:scale-105 transition-all duration-300">
-                        View Details
-                    </button>
+                    <div className="flex items-center space-x-2">
+                        <input
+                            type="number"
+                            value={itemQuantity}
+                            onChange={handleQuantityChange}
+                            min="1"
+                            className="w-16 text-center border border-gray-300 rounded-md py-1 text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <button
+                            className="flex items-center bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-4 py-2 rounded-full font-semibold shadow-lg hover:shadow-xl hover:from-emerald-600 hover:to-teal-700 transform hover:scale-105 transition-all duration-300"
+                            onClick={() => onAddToCart(product, itemQuantity)}
+                        >
+                            <ShoppingCart size={16} className="mr-2" />
+                            Add to Cart
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
