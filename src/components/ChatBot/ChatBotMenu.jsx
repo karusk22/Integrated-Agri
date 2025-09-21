@@ -1,11 +1,41 @@
-export default function ChatBotMenu() {
+import { useState } from 'react';
+
+import {
+  Webchat,
+  WebchatProvider,
+  Fab,
+  getClient,
+} from '@botpress/webchat';
+
+const clientId = "e12ff3c5-50f0-4a6f-977b-32b78989e9a1";
+
+const configuration = {
+  color: '#000',
+};
+
+export default function App() {
+  const client = getClient({
+    clientId,
+  });
+
+  const [isWebchatOpen, setIsWebchatOpen] = useState(false);
+
+  const toggleWebchat = () => {
+    setIsWebchatOpen((prevState) => !prevState);
+  };
+
   return (
-    <div>
-        <div className="w-full text-center">
-            <div></div> {/*Container for showing conversations*/}
-            <input type="text" placeholder="Ask our assistant your doubts related to our products." className="w-1/2 pt-3 pb-3 pl-8 pr-8"/>
-            <input type="submit" value="Send" className="bg-[#0C9489] pt-3 pb-3 pl-8 pr-8 rounded-full text-white font-bold" />
+    <div style={{ width: '100vw', height: '100vh' }}>
+      <WebchatProvider client={client} configuration={configuration}>
+        <Fab onClick={toggleWebchat} />
+        <div
+          style={{
+            display: isWebchatOpen ? 'block' : 'none',
+          }}
+        >
+          <Webchat />
         </div>
+      </WebchatProvider>
     </div>
-  )
+  );
 }
