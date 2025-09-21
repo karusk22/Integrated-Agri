@@ -63,10 +63,9 @@ const ProductList = ({ products, onAddToCart }) => {
                 </header>
 
                 {/* Search and Filter Section */}
-                <div className="max-w-4xl mx-auto mb-12">
+                {/* <div className="max-w-4xl mx-auto mb-12">
                     <div className="bg-white/70 backdrop-blur-md rounded-3xl p-6 shadow-xl border border-white/20">
                         <div className="flex flex-col md:flex-row gap-4">
-                            {/* Search Bar */}
                             <div className="flex-1 relative">
                                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                                 <input
@@ -78,7 +77,6 @@ const ProductList = ({ products, onAddToCart }) => {
                                 />
                             </div>
                             
-                            {/* Filter Dropdown */}
                             <div className="relative">
                                 <Filter className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
                                 <select
@@ -95,7 +93,7 @@ const ProductList = ({ products, onAddToCart }) => {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div> */}
 
                 {/* Products Grid */}
                 <main className="max-w-7xl mx-auto">
@@ -139,9 +137,9 @@ const ProductList = ({ products, onAddToCart }) => {
                             <button className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl hover:from-emerald-600 hover:to-teal-700 transform hover:scale-105 transition-all duration-300" onClick={() => navigate('/addproduct')}>
                                 List Your Products
                             </button>
-                            <button className="bg-white text-emerald-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl border-2 border-emerald-200 hover:border-emerald-300 transform hover:scale-105 transition-all duration-300">
+                            {/* <button className="bg-white text-emerald-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl border-2 border-emerald-200 hover:border-emerald-300 transform hover:scale-105 transition-all duration-300">
                                 Learn More
-                            </button>
+                            </button> */}
                         </div>
                     </div>
                 </section>

@@ -61,7 +61,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // ----------------------------------------------------
-// GEOLOCATION UTILITY FUNCTIONS
+// GEOLOCATION UTILITY FUNCTIONS (Unchanged)
 // ----------------------------------------------------
 
 // Helper function to add a delay
@@ -135,7 +135,7 @@ async function addLocationNames(items) {
 
 
 // ----------------------------------------------------
-// USER AUTHENTICATION
+// USER AUTHENTICATION (Unchanged)
 // ----------------------------------------------------
 app.post('/api/signup', upload.single('profilePicture'), async (req, res) => {
   const { username, email, password, phone_number, user_type, locationName } = req.body; 
@@ -202,7 +202,7 @@ app.get('/api/users/:userId/profile', async (req, res) => {
 });
 
 // ----------------------------------------------------
-// PRODUCT MARKETPLACE
+// PRODUCT MARKETPLACE (Unchanged)
 // ----------------------------------------------------
 app.get('/api/products', async (req, res) => {
   try {
@@ -240,7 +240,7 @@ app.post('/api/products', upload.single('images'), async (req, res) => {
 });
 
 // ----------------------------------------------------
-// FARM EQUIPMENT RENTAL
+// FARM EQUIPMENT RENTAL (Unchanged)
 // ----------------------------------------------------
 app.get('/api/rentals', async (req, res) => {
   try {
@@ -349,7 +349,7 @@ app.post('/api/rentals/book', async (req, res) => {
 
 
 // ----------------------------------------------------
-// CART
+// CART (Unchanged)
 // ----------------------------------------------------
 app.get('/api/users/:userId/cart', async (req, res) => {
   const { userId } = req.params;
@@ -445,7 +445,7 @@ app.delete('/api/users/:userId/cart/remove/:productId', async (req, res) => {
 });
 
 
-// --- ORDER CREATION ---
+// 🔥 ORDER CREATION (UPDATED WITH STOCK REDUCTION) 🔥
 app.post('/api/orders/create', async (req, res) => {
     const { buyer_id, total_price, cartItems } = req.body;
 
@@ -458,16 +458,48 @@ app.post('/api/orders/create', async (req, res) => {
     try {
         await client.query('BEGIN'); 
 
+        // 1. Check stock availability for all items before creating the order
+        for (const item of cartItems) {
+            const stockCheckQuery = 'SELECT quantity FROM products WHERE product_id = $1 FOR UPDATE'; // Lock the row
+            const stockResult = await client.query(stockCheckQuery, [item.product_id]);
+            
+            if (stockResult.rows.length === 0) {
+                throw new Error(`Product with ID ${item.product_id} not found.`);
+            }
+
+            const currentStock = parseInt(stockResult.rows[0].quantity, 10);
+            const orderedQuantity = Number(item.quantity);
+
+            if (currentStock < orderedQuantity) {
+                // Throw an error to trigger the ROLLBACK
+                throw new Error(`Insufficient stock for product: ${item.name}. Available: ${currentStock}, Ordered: ${orderedQuantity}`);
+            }
+        }
+        
+        // 2. Create the new order
         const orderQuery = `INSERT INTO orders (buyer_id, total_price, status) VALUES ($1, $2, 'pending') RETURNING order_id`;
         const orderResult = await client.query(orderQuery, [buyer_id, total_price]);
         const newOrderId = orderResult.rows[0].order_id;
 
+        // 3. Insert order items and update product stock
         for (const item of cartItems) {
             const line_item_price = parseFloat(item.price) * Number(item.quantity);
+            const orderedQuantity = Number(item.quantity);
+            
+            // Insert into orderitems table
             const orderItemQuery = `INSERT INTO orderitems (order_id, product_id, quantity, line_item_price) VALUES ($1, $2, $3, $4)`;
-            await client.query(orderItemQuery, [newOrderId, item.product_id, item.quantity, line_item_price]);
+            await client.query(orderItemQuery, [newOrderId, item.product_id, orderedQuantity, line_item_price]);
+
+            // 🔥 Update product quantity (stock)
+            const updateStockQuery = `
+                UPDATE products 
+                SET quantity = quantity - $1
+                WHERE product_id = $2
+            `;
+            await client.query(updateStockQuery, [orderedQuantity, item.product_id]);
         }
 
+        // 4. Clear the cart
         const cartResult = await client.query('SELECT cart_id FROM cart WHERE user_id = $1', [buyer_id]);
         if (cartResult.rows.length > 0) {
             const cartId = cartResult.rows[0].cart_id;
@@ -475,18 +507,29 @@ app.post('/api/orders/create', async (req, res) => {
         }
 
         await client.query('COMMIT');
-        res.status(201).json({ message: 'Order created successfully!', order_id: newOrderId });
+        res.status(201).json({ message: 'Order created successfully and stock updated!', order_id: newOrderId });
 
     } catch (err) {
         await client.query('ROLLBACK'); 
-        console.error("Error creating order:", err);
-        res.status(500).json({ message: "Failed to create order due to a server error." });
+        console.error("Error creating order and updating stock:", err.message);
+        
+        let statusCode = 500;
+        let errorMessage = "Failed to create order due to a server error.";
+
+        if (err.message.includes("Insufficient stock")) {
+            statusCode = 409; // Conflict
+            errorMessage = err.message;
+        }
+
+        res.status(statusCode).json({ message: errorMessage });
     } finally {
         client.release();
     }
 });
 
-// --- OWNER-SPECIFIC EQUIPMENT & BOOKING ROUTES ---
+// ----------------------------------------------------
+// OWNER-SPECIFIC ROUTES (Unchanged)
+// ----------------------------------------------------
 app.get('/api/users/:userId/equipment', async (req, res) => {
     const { userId } = req.params;
     try {
@@ -540,7 +583,9 @@ app.get('/api/owners/:ownerId/bookings', async (req, res) => {
     }
 });
 
-// --- FARMER-SPECIFIC RENTAL HISTORY & REVIEW ROUTES ---
+// ----------------------------------------------------
+// FARMER-SPECIFIC RENTAL HISTORY & REVIEW ROUTES (Unchanged)
+// ----------------------------------------------------
 app.get('/api/renters/:renterId/bookings', async (req, res) => {
     const { renterId } = req.params;
     try {
@@ -582,7 +627,6 @@ app.put('/api/bookings/:bookingId/complete', async (req, res) => {
     }
 });
 
-// ✅ EDITED: This route was missing and has now been added.
 app.put('/api/bookings/:bookingId/return', async (req, res) => {
     const { bookingId } = req.params;
     try {
@@ -628,4 +672,3 @@ app.post('/api/reviews', async (req, res) => {
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
-

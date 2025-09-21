@@ -6,7 +6,6 @@ const TAX_RATE = 0.05;
 
 /**
  * CartPage Component
- * A two-column layout with cart items and order summary, with checkout functionality.
  */
 const CartPage = ({ user: propUser, cartItems: initialCartItems, onUpdateCart }) => {
   const navigate = useNavigate();
@@ -14,7 +13,7 @@ const CartPage = ({ user: propUser, cartItems: initialCartItems, onUpdateCart })
   const user = propUser || storedUser;
 
   const [cartItems, setCartItems] = useState(initialCartItems || []);
-  const [shippingCost, setShippingCost] = useState(120.0);
+  const [shippingCost] = useState(120.0); // Changed to constant as it's not modified
   const [loading, setLoading] = useState(false);
   const [checkoutMessage, setCheckoutMessage] = useState('');
 
@@ -44,7 +43,8 @@ const CartPage = ({ user: propUser, cartItems: initialCartItems, onUpdateCart })
       if (onUpdateCart) await onUpdateCart();
     } catch (err) {
       console.error("Error updating cart quantity:", err);
-      if (onUpdateCart) await onUpdateCart();
+      // Re-fetch cart even on error to sync with the server state
+      if (onUpdateCart) await onUpdateCart(); 
     } finally {
       setLoading(false);
     }
@@ -54,7 +54,7 @@ const CartPage = ({ user: propUser, cartItems: initialCartItems, onUpdateCart })
     const item = cartItems.find((i) => i.product_id === productId);
     if (!item) return;
     if (Number(item.quantity) >= Number(item.stock)) {
-      alert('Cannot add more items than are currently in stock.');
+      alert(`Cannot add more items than are currently in stock (${item.stock} ${item.unit}).`);
       return;
     }
     updateCartQuantity(productId, Number(item.quantity) + 1);
@@ -83,9 +83,14 @@ const CartPage = ({ user: propUser, cartItems: initialCartItems, onUpdateCart })
     }
   };
 
-  // ✅ NEW: Handles the entire checkout process.
+  // 🔥 UPDATED: Ensures re-fetch and handles specific stock errors.
   const handleCheckout = async () => {
     if (!user || !user.user_id) return navigate('/login');
+    if (cartItems.length === 0) {
+        setCheckoutMessage('Your cart is empty. Please add items to proceed.');
+        return;
+    }
+    
     setLoading(true);
     setCheckoutMessage('');
 
@@ -102,14 +107,20 @@ const CartPage = ({ user: propUser, cartItems: initialCartItems, onUpdateCart })
 
         if (!response.ok) {
             const errorData = await response.json();
-            throw new Error(errorData.message || 'Failed to create order.');
+            // This captures the "Insufficient stock" message from the backend
+            throw new Error(errorData.message || 'Failed to create order due to an unknown error.');
         }
         
-        setCheckoutMessage('Order placed successfully! Redirecting...');
-        // Refresh the cart (which should now be empty) and redirect
-        setTimeout(async () => {
-            if (onUpdateCart) await onUpdateCart();
-            navigate('/');
+        setCheckoutMessage('Order placed successfully! Stock quantity updated.');
+        
+        // 🔥 CRITICAL: Wait for the parent to re-fetch cart AND products
+        if (onUpdateCart) {
+            await onUpdateCart(); 
+        }
+
+        // Redirect to products page to visually confirm stock update
+        setTimeout(() => {
+            navigate('/products'); 
         }, 2000);
 
     } catch (err) {
@@ -151,7 +162,7 @@ const CartPage = ({ user: propUser, cartItems: initialCartItems, onUpdateCart })
     );
   }
 
-  if (cartItems.length === 0 && !checkoutMessage) {
+  if (cartItems.length === 0 && !checkoutMessage.includes('successfully')) {
     return (
       <div className="text-center py-20">
         <Package size={64} className="text-emerald-500 mx-auto mb-4" />
@@ -205,6 +216,11 @@ const CartPage = ({ user: propUser, cartItems: initialCartItems, onUpdateCart })
                     </button>
                   </div>
                 </div>
+                {Number(item.quantity) > Number(item.stock) && (
+                    <p className="text-red-500 text-sm mt-1 font-semibold">
+                        Warning: Only {item.stock} {item.unit} in stock. Please reduce your quantity.
+                    </p>
+                )}
               </div>
             </div>
           ))}
@@ -225,16 +241,17 @@ const CartPage = ({ user: propUser, cartItems: initialCartItems, onUpdateCart })
               <div className="flex justify-between pt-3 text-xl font-extrabold text-emerald-700"><span>Grand Total:</span><span>₹{totals.grandTotal.toFixed(2)}</span></div>
             </div>
             
-            {/* ✅ REMOVED Coupon Section */}
-            
             {checkoutMessage && (
-                <p className={`text-center font-medium mb-4 ${checkoutMessage.includes('successfully') ? 'text-green-600' : 'text-red-500'}`}>
+                <p className={`text-center font-medium mb-4 p-2 rounded ${checkoutMessage.includes('successfully') ? 'text-green-800 bg-green-100' : 'text-red-700 bg-red-100'}`}>
                     {checkoutMessage}
                 </p>
             )}
             
-            {/* ✅ UPDATED Button to handle checkout */}
-            <button onClick={handleCheckout} disabled={loading || cartItems.length === 0} className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xl font-bold py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed">
+            <button 
+                onClick={handleCheckout} 
+                disabled={loading || cartItems.length === 0} 
+                className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xl font-bold py-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+            >
               {loading ? 'Processing...' : 'Proceed to Checkout'}
             </button>
           </div>
@@ -245,4 +262,3 @@ const CartPage = ({ user: propUser, cartItems: initialCartItems, onUpdateCart })
 };
 
 export default CartPage;
-

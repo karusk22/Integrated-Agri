@@ -4,7 +4,7 @@ import { Search, MapPin, Star, Wrench, CalendarDays, Leaf, UserCheck, X } from '
 
 /**
  * RentalCard Component
- * Displays a single rental item. This is included here to keep the main file self-contained.
+ * Displays a single rental item.
  */
 const RentalCard = ({ rental, onBookNow }) => {
     const getRentalImage = () => {
@@ -45,8 +45,8 @@ const RentalCard = ({ rental, onBookNow }) => {
                     </div>
                 )}
                 <div className="flex items-center mb-4">
-                    <div className="flex">{[...Array(5)].map((_, i) => (<Star key={i} size={16} className={i < rating ? "text-yellow-400 fill-yellow-400" : "text-gray-200"}/>))}</div>
-                    <span className="ml-2 text-sm text-gray-600 font-medium">{rating}.0 ({reviews})</span>
+                    <div className="flex">{[...Array(5)].map((_, i) => (<Star key={i} size={16} className={i < rental.rating || 0 ? "text-yellow-400 fill-yellow-400" : "text-gray-200"}/>))}</div>
+                    <span className="ml-2 text-sm text-gray-600 font-medium">{rental.rating || 'N/A'}.0 ({rental.reviews || 0})</span>
                 </div>
                 <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-auto">
                     <div className="flex items-center text-gray-700">
@@ -69,13 +69,11 @@ const RentalCard = ({ rental, onBookNow }) => {
 
 /**
  * RentalPage Component
- * Fetches and displays available farm equipment rentals from the backend,
- * and handles the booking process via a modal.
  */
-const RentalPage = () => {
+const RentalPage = ({ rentals: propRentals }) => {
     const navigate = useNavigate();
     const [user, setUser] = useState(null);
-    const [rentals, setRentals] = useState([]);
+    const [rentals, setRentals] = useState(propRentals || []);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     
@@ -88,30 +86,35 @@ const RentalPage = () => {
     const [bookingMessage, setBookingMessage] = useState('');
     const [isBooking, setIsBooking] = useState(false);
 
+    // Function to fetch rentals
+    const fetchRentals = async () => {
+        try {
+            setLoading(true);
+            const response = await fetch('http://localhost:3001/api/rentals');
+            if (!response.ok) throw new Error('Failed to fetch rentals');
+            const data = await response.json();
+            setRentals(data);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        // Check for logged-in user
+        // Load user from local storage
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
             setUser(JSON.parse(storedUser));
         }
         
-        // Fetch rental data
-        const fetchRentals = async () => {
-            try {
-                setLoading(true);
-                const response = await fetch('http://localhost:3001/api/rentals');
-                if (!response.ok) throw new Error('Failed to fetch rentals');
-                const data = await response.json();
-                setRentals(data);
-            } catch (err) {
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchRentals();
-    }, []);
+        // If propRentals are not passed (or are empty), fetch data
+        if (!propRentals || propRentals.length === 0) {
+            fetchRentals();
+        } else {
+            setLoading(false);
+        }
+    }, [propRentals]);
     
     // Filter logic for search
     const filteredRentals = rentals.filter(rental => {
@@ -181,7 +184,7 @@ const RentalPage = () => {
             
             setTimeout(() => {
                 setIsModalOpen(false);
-                window.location.reload(); // Refresh to show updated availability
+                fetchRentals(); // Re-fetch to update availability status immediately
             }, 2000);
 
         } catch (err) {
@@ -190,6 +193,18 @@ const RentalPage = () => {
             setIsBooking(false);
         }
     };
+
+    // Determine if the user is an equipment owner
+    // Assuming the user_type from your backend is 'equipment_owner'
+    const isEquipmentOwner = user && user.user_type === 'owner';
+
+    const handleListMachineClick = () => {
+        // Basic check, though the button should already be hidden from non-owners
+        if (isEquipmentOwner) {
+            navigate('/addrentalproduct');
+        }
+    };
+
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -200,15 +215,22 @@ const RentalPage = () => {
                     <h1 className="text-5xl md:text-7xl font-black bg-gradient-to-r from-emerald-600 to-cyan-600 bg-clip-text text-transparent">Sandhai Rentals</h1>
                     <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto">Rent the right farm equipment for your needs.</p>
                 </header>
-                {/* <div className="max-w-4xl mx-auto mb-12">
-                    <div className="bg-white/70 backdrop-blur-md rounded-3xl p-6 shadow-xl">
-                        <div className="flex-1 relative">
-                            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                            <input type="text" placeholder="Search machinery or location..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-12 pr-4 py-4 rounded-2xl border-gray-200 focus:border-emerald-400 outline-none"/>
+                
+                <main className="max-w-7xl mx-auto">
+                    {/* Optional Search Bar */}
+                    <div className="max-w-4xl mx-auto mb-12">
+                        <div className="bg-white/70 backdrop-blur-md rounded-3xl p-3 shadow-xl flex items-center">
+                            <Search className="ml-4 text-gray-400" size={20} />
+                            <input 
+                                type="text" 
+                                placeholder="Search machinery or location..." 
+                                value={searchTerm} 
+                                onChange={(e) => setSearchTerm(e.target.value)} 
+                                className="w-full pl-3 pr-4 py-2 bg-transparent focus:outline-none"
+                            />
                         </div>
                     </div>
-                </div> */}
-                <main className="max-w-7xl mx-auto">
+                    
                     {loading && <div className="text-center py-16 font-semibold">Loading...</div>}
                     {!loading && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -224,25 +246,31 @@ const RentalPage = () => {
                     )}
                 </main>
 
-                {/* ✅ CORRECTED: Added back the missing "Call to Action" and "Footer" sections */}
+                {/* Call to Action section with conditional rendering */}
                 <section className="mt-24 text-center">
                     <div className="bg-white/70 backdrop-blur-md rounded-3xl p-12 shadow-2xl border border-white/20 max-w-4xl mx-auto">
                         <h2 className="text-4xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent mb-4">
-                            Join Our Sustainable Network
+                            {isEquipmentOwner ? "Got a Machine to Rent?" : "Your Source for Farm Equipment"}
                         </h2>
                         <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-                            Connect with like-minded farmers and contribute to a circular economy in agriculture.
+                            {isEquipmentOwner 
+                                ? "List your farm equipment and start earning today by connecting with farmers."
+                                : "Browse the available equipment above and easily book what you need for your next harvest."
+                            }
                         </p>
+                        
                         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                            <button
-                                onClick={() => navigate('/addrentalproduct')}
-                                className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl hover:from-emerald-600 hover:to-teal-700 transform hover:scale-105 transition-all duration-300"
-                            >
-                                List Your Machine
-                            </button>
-                            <button className="bg-white text-emerald-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl border-2 border-emerald-200 hover:border-emerald-300 transform hover:scale-105 transition-all duration-300">
-                                Learn More
-                            </button>
+                            
+                            {/* ONLY List Your Machine button shows for the owner */}
+                            {isEquipmentOwner && (
+                                <button
+                                    onClick={handleListMachineClick}
+                                    className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl hover:from-emerald-600 hover:to-teal-700 transform hover:scale-105 transition-all duration-300"
+                                >
+                                    List Your Machine
+                                </button>
+                            )}
+
                         </div>
                     </div>
                 </section>
@@ -308,4 +336,3 @@ const RentalPage = () => {
 };
 
 export default RentalPage;
-
