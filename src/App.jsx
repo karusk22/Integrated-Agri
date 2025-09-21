@@ -83,6 +83,13 @@ const AppContent = () => {
       navigate('/login');
       return;
     }
+    
+    // Validation check: Prevent owner from buying their own product
+    if (parseInt(product.seller_id) === parseInt(userId)) {
+        // The ProductCard handles the visual block, this is the final security check
+        return; 
+    }
+
     try {
       const response = await fetch(`http://localhost:3001/api/users/${userId}/cart/add`, {
         method: 'POST',
@@ -96,10 +103,9 @@ const AppContent = () => {
     }
   };
 
-  // 🔥 UPDATED: This function is called after checkout and now triggers product re-fetch.
   const handleUpdateCart = async () => {
     await fetchCartItems();
-    await fetchProducts(); // 👈 THIS IS THE CRITICAL LINE TO UPDATE STOCK DISPLAY
+    await fetchProducts(); 
   };
 
   const handleAddProduct = async (newProduct) => {
@@ -108,15 +114,12 @@ const AppContent = () => {
       return;
     }
     try {
-      // NOTE: Your original logic sends location as an object, but your backend expects a locationName string.
-      // You may need to adjust this in AddProducts component or here if your backend logic for geocoding is to be followed.
       const response = await fetch('http://localhost:3001/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...newProduct,
           seller_id: userId,
-          // Assuming locationName is passed from form or derived
           locationName: newProduct.locationName || 'Coimbatore, India' 
         }),
       });
@@ -140,7 +143,6 @@ const AppContent = () => {
         body: JSON.stringify({
           ...newRental,
           owner_id: userId,
-          // Assuming locationName is passed from form or derived
           locationName: newRental.locationName || 'Coimbatore, India' 
         }),
       });
@@ -180,23 +182,44 @@ const AppContent = () => {
         <Route path="/" element={<HomePage />} />
         <Route path="/signup" element={<SignUpForm onLoginSuccess={handleLogin} />} />
         <Route path="/login" element={<LoginForm onLoginSuccess={handleLogin} />} />
-        <Route path="/products" element={<ProductList products={products} onAddToCart={handleAddToCart} />} />
+        
+        {/* 🔥 UPDATED: Passing the user object to ProductList */}
+        <Route 
+            path="/products" 
+            element={
+                <ProductList 
+                    products={products} 
+                    onAddToCart={handleAddToCart} 
+                    user={user} 
+                />
+            } 
+        />
+        
         <Route path="/rental" element={<RentalPage rentals={rentals} />} />
-        <Route path="/addproduct" element={<AddProduct onAddProduct={handleAddProduct} />} />
+        <Route path="/addproduct" element={<AddProduct onAddProduct={handleAddProduct} user={user} />} />
         <Route path="/addrentalproduct" element={<AddRentalProduct onAddRental={handleAddRental} />} />
         <Route path="/chatbot" element={<ChatBotMenu />} />
         <Route 
             path="/cartpage" 
             element={
                 <CartPage 
-                    user={user} // Pass user down for checkout
+                    user={user} 
                     cartItems={cartItems} 
-                    onUpdateCart={handleUpdateCart} // Updated function handles both cart and product re-fetch
+                    onUpdateCart={handleUpdateCart} 
                 />
             } 
         />
-        <Route path="/profile" element={<ProfilePage user={user} />} />
+        <Route 
+            path="/profile" 
+            element={
+                <ProfilePage 
+                    user={user} 
+                    onRentalStatusUpdate={fetchRentals}
+                />
+            } 
+        />
       </Routes>
+      
       <Footer />
     </div>
   );

@@ -242,15 +242,8 @@ const AddProduct = ({ onAddProduct, user }) => { // ⬅️ Passed onAddProduct a
               <button
                 type="button"
                 className="w-full sm:w-auto bg-white text-emerald-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl border-2 border-emerald-200 hover:border-emerald-300 transform hover:scale-105 transition-all duration-300"
-                onClick={() => setProduct({
-                  name: '',
-                  description: '',
-                  locationName: '',
-                  quantity: '',
-                  unit: 'kg',
-                  price: '',
-                  images: null,
-                })}
+                // 🚀 FIXED: Navigate back to the previous page
+                onClick={() => navigate(-1)}
               >
                 Cancel
               </button>

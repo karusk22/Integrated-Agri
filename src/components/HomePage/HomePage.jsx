@@ -6,6 +6,11 @@ import foodWaste from '../../assets/background/food-waste-1.jpg';
 import ChatBotMenu from '../ChatBot/ChatBotMenu';
 import chatboticon from '../../assets/background/icons8-chatbot3-48.png';
 
+// Function to scroll the window to the top (0, 0 coordinates)
+const scrollToTop = () => {
+  window.scrollTo(0, 0);
+};
+
 // The main HomePage component, now with an updated theme and more content.
 export default function HomePage() {
   return (
@@ -30,7 +35,12 @@ export default function HomePage() {
             <p className="text-lg md:text-xl max-w-2xl mx-auto mb-8 animate-fadeInUp animate-delay-200 text-gray-700">
                 A unified digital platform for monetizing agricultural by-products and accessing affordable farm equipment rentals.
             </p>
-            <Link to="/products" className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 hover:from-emerald-600 hover:to-teal-700 animate-fadeInUp animate-delay-400">
+            {/* 🚀 Updated Link: Browse our Shop */}
+            <Link 
+                to="/products" 
+                onClick={scrollToTop} 
+                className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 hover:from-emerald-600 hover:to-teal-700 animate-fadeInUp animate-delay-400"
+            >
                 Browse our Shop
             </Link>
             </div>
@@ -47,7 +57,12 @@ export default function HomePage() {
                 <p className="text-gray-600 leading-relaxed">
                     What many see as waste, we see as possibility. Every peel, husk, and leftover holds hidden potential to create energy, feed, compost, or new products. By rethinking agricultural by-products, we reduce waste, close the loop, and build a sustainable cycle where nothing goes unused.
                 </p>
-                <Link to="/products" className="inline-block mt-8 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold py-3 px-6 rounded-full shadow-md transition-colors duration-300 hover:from-emerald-600 hover:to-teal-700">
+                {/* 🚀 Updated Link: Check out Byproducts */}
+                <Link 
+                    to="/products" 
+                    onClick={scrollToTop} 
+                    className="inline-block mt-8 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold py-3 px-6 rounded-full shadow-md transition-colors duration-300 hover:from-emerald-600 hover:to-teal-700"
+                >
                     Check out Byproducts
                 </Link>
                 </div>
@@ -61,7 +76,12 @@ export default function HomePage() {
                 <p className="text-gray-600 leading-relaxed">
                     Behind every harvest is the strength of innovation. Modern equipment empowers farmers to work smarter, save resources, and bring out the best from every acre. By combining tradition with technology, we cultivate not just crops, but a future of efficiency, resilience, and sustainability in agriculture.
                 </p>
-                <Link to="/rental" className="inline-block mt-8 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold py-3 px-6 rounded-full shadow-md transition-colors duration-300 hover:from-emerald-600 hover:to-teal-700">
+                {/* 🚀 Updated Link: Browse Machinery Catalog */}
+                <Link 
+                    to="/rental" 
+                    onClick={scrollToTop} 
+                    className="inline-block mt-8 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold py-3 px-6 rounded-full shadow-md transition-colors duration-300 hover:from-emerald-600 hover:to-teal-700"
+                >
                     Browse Machinery Catalog
                 </Link>
                 </div>
@@ -138,4 +158,4 @@ const Footer = () => (
       <p>&copy; 2024 Sandhai. All rights reserved.</p>
     </div>
   </footer>
-); 
+);
