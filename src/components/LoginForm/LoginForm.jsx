@@ -28,13 +28,12 @@ export default function LoginForm() {
     // For demonstration, we'll assume the login was successful.
     // In a real app, you would handle the response from your backend.
     if (email === 'user@example.com' && password === 'password') {
-      setMessage('Login successful! Redirecting to dashboard...');
       
       // Navigate to the homepage after a short delay.
       setTimeout(() => {
         navigate('/');
         window.scrollTo(0, 0); // Scroll to the top of the page after navigation
-      }, 1500);
+      }, 0);
 
     } else {
       setMessage('Invalid email or password.');
