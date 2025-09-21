@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react'; // ⬅️ Import useRef
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 // The main App component which renders the sign-up form.
 export default function SignUpForm() {
   const navigate = useNavigate(); // Initialize the navigate function
   const location = useLocation(); // Get the current location object
+  const fileInputRef = useRef(null); // ⬅️ Ref to programmatically click the hidden file input
 
   // Scroll to the top of the page on component mount or location change.
   useEffect(() => {
@@ -23,10 +24,15 @@ export default function SignUpForm() {
     location: '',
   });
 
+  // ⬅️ New state for the profile picture file and its preview URL
+  const [profilePicture, setProfilePicture] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  // You can keep this state, but it might not be needed depending on your final CSS setup.
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
-  // Handler for input changes
+  // Handler for text input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -50,6 +56,15 @@ export default function SignUpForm() {
     });
   };
 
+  // ⬅️ New handler for when a picture is selected
+  const handlePictureChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setProfilePicture(file); // Store the file object
+      setPreviewUrl(URL.createObjectURL(file)); // Create a temporary URL for preview
+    }
+  };
+
   // Handles the form submission logic.
   const handleSubmit = async (e) => {
     e.preventDefault(); // Prevent default form submission behavior
@@ -63,42 +78,55 @@ export default function SignUpForm() {
       return;
     }
 
-    // Prepare the data to be sent to the backend.
-    const dataToSubmit = {
-      fullName: formData.fullName,
-      email: formData.email,
-      phone: formData.phone,
-      password: formData.password,
-      userRole: formData.userRole,
-      location: formData.location,
-    };
+    // ⬅️ UPDATED: Use FormData to handle file uploads along with other data
+    const submissionData = new FormData();
+    submissionData.append('username', formData.fullName);
+    submissionData.append('email', formData.email);
+    submissionData.append('phone_number', formData.phone);
+    submissionData.append('password', formData.password);
+    submissionData.append('user_type', formData.userRole[0]);
+    submissionData.append('locationName', formData.location);
     
-    // Simulate an API call to your backend.
-    console.log('Submitting Form:', dataToSubmit);
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API delay
+    if (profilePicture) {
+      // The key 'profilePicture' must match what your backend expects (e.g., using Multer)
+      submissionData.append('profilePicture', profilePicture);
+    }
+    
+    try {
+      const response = await fetch('http://localhost:3001/api/signup', {
+        method: 'POST',
+        // IMPORTANT: Do NOT set the 'Content-Type' header. 
+        // The browser will automatically set it to 'multipart/form-data' with the correct boundary.
+        body: submissionData,
+      });
 
-    // For demonstration, we'll assume the sign-up was successful.
-    setMessage('Account created successfully!');
-    setLoading(false);
+      const result = await response.json();
 
-    // Redirect the user to the home page after a short delay.
-    setTimeout(() => {
-      navigate('/');
-      window.scrollTo(0, 0); // Scroll to the top of the page after navigation
-    }, 1500);
+      if (response.ok) {
+        setMessage('Account created successfully! Redirecting to login...');
+        setTimeout(() => {
+          navigate('/login');
+          window.scrollTo(0, 0);
+        }, 1500);
+      } else {
+        setMessage(result.message || 'Registration failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('Network error:', error);
+      setMessage('An error occurred. Please check your network connection.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const roles = [
     { value: 'farmer', label: 'Farmer', emoji: '🧑‍🌾' },
-    { value: 'equipment-owner', label: 'Equipment Owner', emoji: '🚜' },
+    { value: 'owner', label: 'Equipment Owner', emoji: '🚜' },
   ];
 
   return (
-    // Main container for the form with a vibrant, themed background.
-    <div className="min-h-screen flex items-center justify-start pt-16 pb-16 font-sans">
-      {/* Form container with card-like styling, using a subtle shadow and rounded corners. */}
+    <div className="min-h-screen flex items-center justify-start pt-16 pb-16 font-sans bg-gray-100">
       <div className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-md mx-auto">
-        {/* Header section of the form with a themed icon. */}
         <div className="text-center mb-6">
           <div className="text-4xl mb-4 text-green-800">🌱</div>
           <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent tracking-tight mb-2">
@@ -109,8 +137,31 @@ export default function SignUpForm() {
           </p>
         </div>
 
-        {/* The sign-up form itself. */}
         <form onSubmit={handleSubmit}>
+          {/* ⬅️ New Profile Picture Input Section */}
+          <div className="mb-6 flex flex-col items-center">
+            <label className="block text-gray-700 text-sm font-semibold mb-2">
+              Profile Picture (Optional)
+            </label>
+            <div
+              className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center cursor-pointer border-2 border-dashed border-gray-400 hover:border-green-500 transition-all duration-300"
+              onClick={() => fileInputRef.current.click()} // Clicks the hidden input
+            >
+              {previewUrl ? (
+                <img src={previewUrl} alt="Profile Preview" className="w-full h-full rounded-full object-cover" />
+              ) : (
+                <svg className="w-12 h-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+              )}
+            </div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handlePictureChange}
+              className="hidden" // The input is hidden and controlled programmatically
+              accept="image/png, image/jpeg, image/jpg"
+            />
+          </div>
+
           {/* Full Name input field. */}
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="fullName">
@@ -144,8 +195,7 @@ export default function SignUpForm() {
               required
             />
           </div>
-
-          {/* Phone Number input field. */}
+          
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="phone">
               Phone Number
@@ -162,7 +212,6 @@ export default function SignUpForm() {
             />
           </div>
           
-          {/* Password input field. */}
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="password">
               Password
@@ -179,7 +228,6 @@ export default function SignUpForm() {
             />
           </div>
 
-          {/* Confirm Password input field. */}
           <div className="mb-4">
             <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="confirmPassword">
               Confirm Password
@@ -196,7 +244,6 @@ export default function SignUpForm() {
             />
           </div>
           
-          {/* User Role selection using clickable cards. */}
           <div className="mb-6">
             <label className="block text-gray-700 text-sm font-semibold mb-2">
               I am a...
@@ -206,14 +253,7 @@ export default function SignUpForm() {
                 <div
                   key={role.value}
                   onClick={() => handleRoleClick(role.value)}
-                  className={`
-                    flex flex-col items-center justify-center p-4 rounded-lg
-                    border-2 cursor-pointer transition-all duration-200
-                    ${formData.userRole.includes(role.value) ? 
-                      'border-green-600 bg-green-50 shadow-md' : 
-                      'border-gray-300 hover:border-green-400'
-                    }
-                  `}
+                  className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 cursor-pointer transition-all duration-200 ${formData.userRole.includes(role.value) ? 'border-green-600 bg-green-50 shadow-md' : 'border-gray-300 hover:border-green-400'}`}
                 >
                   <span className="text-2xl">{role.emoji}</span>
                   <span className="text-sm font-medium mt-2 text-center">{role.label}</span>
@@ -222,7 +262,6 @@ export default function SignUpForm() {
             </div>
           </div>
 
-          {/* Location input field. */}
           <div className="mb-6">
             <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="location">
               Location (City/State)
@@ -239,14 +278,12 @@ export default function SignUpForm() {
             />
           </div>
 
-          {/* Message display area for success or errors. */}
           {message && (
             <p className={`text-center font-medium ${message.includes('successfully') ? 'text-green-600' : 'text-red-500'}`}>
               {message}
             </p>
           )}
 
-          {/* Submit button with loading state. */}
           <button
             type="submit"
             className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold py-3 px-4 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 hover:from-emerald-600 hover:to-teal-700 focus:outline-none disabled:bg-gray-400 disabled:cursor-not-allowed"
@@ -263,7 +300,6 @@ export default function SignUpForm() {
           </button>
         </form>
 
-        {/* Optional footer for logging in. */}
         <p className="mt-6 text-center text-gray-500 text-sm">
           Already have an account? <Link to="/login" className="text-green-600 hover:underline font-semibold">Log in</Link>
         </p>

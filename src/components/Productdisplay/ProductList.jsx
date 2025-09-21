@@ -1,83 +1,25 @@
 import React, { useState } from 'react';
 import { Filter, Search, Leaf } from 'lucide-react';
-import Navbar from '../NavBar/NavBar';
 import { useNavigate } from 'react-router-dom';
 import ProductCard from './ProductCard'; // Import the ProductCard component
 
 /**
  * Main ProductList Component with Enhanced UI
+ * This component now receives products and cart handlers as props.
  */
-const ProductList = () => {
+// ⬅️ UPDATED: The component now accepts `products` and `onAddToCart` as props
+const ProductList = ({ products, onAddToCart }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedFilter, setSelectedFilter] = useState('all');
     const navigate = useNavigate();
 
-    const sampleProducts = [
-        {
-            name: "Premium Wheat Straw Bales",
-            image: "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=600&h=400&fit=crop",
-            location: "Villupuram, Tamil Nadu",
-            quantity: "500 kg",
-            price: 12,
-            tags: ["Crop Residue", "Animal Feed", "Organic"],
-            rating: 4,
-            reviews: 12,
-        },
-        {
-            name: "Fresh Sugarcane Bagasse",
-            image: "https://images.unsplash.com/photo-1563514227147-6d2ff665a6a0?w=600&h=400&fit=crop",
-            location: "Madurai, Tamil Nadu",
-            quantity: "200 kg",
-            price: 15,
-            tags: ["Organic", "Biofuel", "Sustainable"],
-            rating: 5,
-            reviews: 8,
-        },
-        {
-            name: "High-Quality Maize Stover",
-            image: "https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=600&h=400&fit=crop",
-            location: "Tiruchirappalli, Tamil Nadu",
-            quantity: "800 kg",
-            price: 8,
-            tags: ["Crop Residue", "Fertilizer", "Budget"],
-            rating: 4,
-            reviews: 25,
-        },
-        {
-            name: "Golden Paddy Straw",
-            image: "https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=600&h=400&fit=crop",
-            location: "Thanjavur, Tamil Nadu",
-            quantity: "1000 kg",
-            price: 10,
-            tags: ["Animal Feed", "Mulch", "Traditional"],
-            rating: 3,
-            reviews: 5,
-        },
-        {
-            name: "Natural Coconut Coir",
-            image: "https://images.unsplash.com/photo-1615811361523-6bd03d7748e7?w=600&h=400&fit=crop",
-            location: "Pollachi, Tamil Nadu",
-            quantity: "150 kg",
-            price: 20,
-            tags: ["Organic", "Gardening", "Premium"],
-            rating: 5,
-            reviews: 30,
-        },
-        {
-            name: "Rice Husk Pellets",
-            image: "https://images.unsplash.com/photo-1586201375761-83865001e31c?w=600&h=400&fit=crop",
-            location: "Coimbatore, Tamil Nadu",
-            quantity: "300 kg",
-            price: 18,
-            tags: ["Biofuel", "Eco-friendly", "Processed"],
-            rating: 4,
-            reviews: 15,
-        }
-    ];
+    // ⬅️ REMOVED: The mock `sampleProducts` array has been removed.
 
+    // ⬅️ ADDED: The filters array has been recreated locally.
     const filters = ['all', 'Organic', 'Animal Feed', 'Biofuel', 'Crop Residue'];
 
-    const filteredProducts = sampleProducts.filter(product => {
+    // ⬅️ UPDATED: The filter logic now uses the `products` prop from App.js
+    const filteredProducts = products.filter(product => {
         const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                               product.location.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesFilter = selectedFilter === 'all' || product.tags.includes(selectedFilter);
@@ -86,7 +28,7 @@ const ProductList = () => {
 
     return (
         <div className="min-h-screen">
-            <Navbar />
+            {/* ⬅️ REMOVED: The Navbar is already rendered in App.js */}
             <div className="relative z-10 p-8">
                 {/* Hero Header */}
                 <header className="text-center mb-16">
@@ -160,13 +102,14 @@ const ProductList = () => {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {filteredProducts.map((product, index) => (
                             <div
-                                key={index}
+                                key={product.product_id}
                                 className="transform transition-all duration-500"
                                 style={{
                                     animationDelay: `${index * 100}ms`
                                 }}
                             >
-                                <ProductCard product={product} />
+                                {/* ⬅️ UPDATED: The onAddToCart handler is now passed as a prop */}
+                                <ProductCard product={product} onAddToCart={onAddToCart} />
                             </div>
                         ))}
                     </div>

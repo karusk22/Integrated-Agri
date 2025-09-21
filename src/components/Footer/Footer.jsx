@@ -1,7 +1,7 @@
 function Footer() {
     return (
         <>
-            <div>
+            {/* <div>
                 <h1>Company Name</h1>
                 <ul>
                     <li>Facebook</li>
@@ -22,7 +22,7 @@ function Footer() {
                     <li><a href="#">Privacy Policy</a></li>
                     <li><a href="#">Terms of Use</a></li>
                 </ul>
-            </div>
+            </div> */}
         </>
     )
 }

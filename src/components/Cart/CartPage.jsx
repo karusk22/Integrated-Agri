@@ -1,44 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Minus, Plus, Trash2, MapPin, Package, Percent } from 'lucide-react';
-import Navbar from '../NavBar/NavBar';
-// import Navbar from '../NavBar/NavBar'; // Assuming you handle this import outside the scope of the component for now
-
-/**
- * Mock data structure for the cart
- */
-const initialCartItems = [
-    {
-        id: 1,
-        name: 'Organic Premium Basmati Rice (5kg Bag)',
-        image: 'https://via.placeholder.com/150/10B981/FFFFFF?text=Rice', // Placeholder image
-        price: 650.00,
-        unit: 'Bag',
-        quantity: 1,
-        farmerLocation: 'Punjab, India',
-        stock: 5,
-    },
-    {
-        id: 2,
-        name: 'Fresh Locally Sourced Tomatoes',
-        image: 'https://via.placeholder.com/150/EF4444/FFFFFF?text=Tomato', // Placeholder image
-        price: 45.00,
-        unit: 'kg',
-        quantity: 3,
-        farmerLocation: 'Maharashtra, India',
-        stock: 20,
-    },
-    {
-        id: 3,
-        name: 'Natural Cow Ghee (500ml Jar)',
-        image: 'https://via.placeholder.com/150/F59E0B/FFFFFF?text=Ghee', // Placeholder image
-        price: 480.00,
-        unit: 'Jar',
-        quantity: 2,
-        farmerLocation: 'Gujarat, India',
-        stock: 10,
-    },
-];
+import Navbar from '../NavBar/NavBar.jsx';
 
 const TAX_RATE = 0.05; // 5% tax
 
@@ -46,44 +9,103 @@ const TAX_RATE = 0.05; // 5% tax
  * CartPage Component
  * A two-column layout with cart items and order summary.
  */
-const CartPage = () => {
+const CartPage = ({ user, cartItems: initialCartItems, onUpdateCart }) => {
     const navigate = useNavigate();
 
     const [cartItems, setCartItems] = useState(initialCartItems);
     const [couponCode, setCouponCode] = useState('');
     const [discount, setDiscount] = useState(0);
     const [shippingCost, setShippingCost] = useState(120.00); // Fixed or estimated shipping
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+      setCartItems(initialCartItems);
+    }, [initialCartItems]);
 
     // --- Core Cart Logic ---
 
     // Function to handle quantity change
-    const handleQuantityChange = (id, change) => {
-        setCartItems(prevItems =>
-            prevItems.map(item => {
-                if (item.id === id) {
-                    const newQty = item.quantity + change;
-                    if (newQty > 0 && newQty <= item.stock) {
-                        return { ...item, quantity: newQty };
-                    }
-                }
-                return item;
-            }).filter(item => item.quantity > 0)
-        );
+    const handleQuantityChange = async (productId, change) => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+
+        const currentItem = cartItems.find(item => item.product_id === productId);
+        if (!currentItem) return;
+
+        const newQty = currentItem.quantity + change;
+        if (newQty <= 0) {
+            await handleRemoveItem(productId);
+            return;
+        }
+
+        if (newQty > currentItem.quantity) {
+             // Check against available stock
+            const product = await fetch(`http://localhost:3001/api/products/${productId}`).then(res => res.json());
+            if (newQty > product.quantity) {
+                alert('Cannot add more than available stock.');
+                return;
+            }
+        }
+        
+        try {
+            setLoading(true);
+            const response = await fetch(`http://localhost:3001/api/users/${user.user_id}/cart/update/${productId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ quantity: newQty }),
+            });
+            if (!response.ok) throw new Error('Failed to update item quantity');
+            await onUpdateCart(); // Trigger fetch in parent
+        } catch (err) {
+            console.error('Error updating cart:', err);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Function to handle item removal
-    const handleRemoveItem = (id) => {
-        setCartItems(prevItems => prevItems.filter(item => item.id !== id));
+    const handleRemoveItem = async (productId) => {
+        if (!user) {
+            navigate('/login');
+            return;
+        }
+        try {
+            setLoading(true);
+            const response = await fetch(`http://localhost:3001/api/users/${user.user_id}/cart/remove/${productId}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) throw new Error('Failed to remove item');
+            await onUpdateCart(); // Trigger fetch in parent
+        } catch (err) {
+            console.error('Error removing item:', err);
+        } finally {
+            setLoading(false);
+        }
     };
 
     // Function to apply coupon (placeholder logic)
-    const applyCoupon = () => {
-        if (couponCode.toUpperCase() === 'AGRI10') {
-            setDiscount(0.10); // 10% discount
-            alert('Coupon applied successfully! You got 10% off.');
-        } else {
-            setDiscount(0);
-            alert('Invalid coupon code. Try AGRI10.');
+    const applyCoupon = async () => {
+        if (!couponCode) return;
+        setLoading(true);
+        try {
+            // This would ideally be an API call to a coupon service
+            // const response = await fetch('http://localhost:3001/api/cart/apply-coupon', { ... });
+            // const result = await response.json();
+            // if (result.discount) { setDiscount(result.discount); }
+            if (couponCode.toUpperCase() === 'AGRI10') {
+                setDiscount(0.10); // 10% discount
+                alert('Coupon applied successfully! You got 10% off.');
+            } else {
+                setDiscount(0);
+                alert('Invalid coupon code. Try AGRI10.');
+            }
+        } catch (err) {
+            console.error("Error applying coupon:", err);
+            alert("An error occurred while applying the coupon.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -105,8 +127,16 @@ const CartPage = () => {
 
     // ⬅️ NEW HELPER FUNCTION: Combines navigation and scroll
     const handleContinueShopping = () => {
-        navigate('/');
+        navigate('/products');
         window.scrollTo(0, 0);
+    };
+
+    // Get the correct image URL
+    const getProductImage = (dbPath) => {
+        if (dbPath && dbPath.length > 0) {
+            return `http://localhost:3001${dbPath[0]}`;
+        }
+        return 'https://placehold.co/150/10B981/FFFFFF?text=Product';
     };
 
     // --- Component Rendering ---
@@ -131,7 +161,6 @@ const CartPage = () => {
 
     return (
         <>
-        <Navbar />
         <div className="container mx-auto p-4 sm:p-6 lg:p-8">
             
             <h1 className="text-4xl font-extrabold text-gray-900 mb-8 border-b pb-4">
@@ -144,13 +173,13 @@ const CartPage = () => {
                 <div className="lg:col-span-2 space-y-6">
                     {cartItems.map((item) => (
                         <div
-                            key={item.id}
+                            key={item.cart_item_id} // ⬅️ Using cart_item_id as the key
                             className="flex flex-col sm:flex-row bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden p-4 border border-gray-100"
                         >
                             {/* Item Image */}
                             <div className="w-full sm:w-40 h-32 sm:h-auto overflow-hidden rounded-lg sm:mr-6 flex-shrink-0">
                                 <img
-                                    src={item.image}
+                                    src={getProductImage(item.images)}
                                     alt={item.name}
                                     className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-500"
                                 />
@@ -164,7 +193,7 @@ const CartPage = () => {
                                 
                                 <div className="flex items-center text-sm text-gray-500 my-1">
                                     <MapPin size={14} className="mr-1 text-emerald-500" />
-                                    <span>From {item.farmerLocation}</span>
+                                    <span>From {item.location_name || 'Location not specified'}</span>
                                 </div>
                                 
                                 <p className="text-lg font-semibold text-gray-700 mt-2">
@@ -177,10 +206,10 @@ const CartPage = () => {
                                         <label className="text-gray-600 font-medium">Quantity:</label>
                                         <div className="flex items-center border border-gray-300 rounded-full overflow-hidden">
                                             <button
-                                                onClick={() => handleQuantityChange(item.id, -1)}
+                                                onClick={() => handleQuantityChange(item.product_id, -1)}
                                                 className="p-2 bg-gray-100 hover:bg-red-500 hover:text-white transition-all duration-200"
                                                 aria-label="Decrease quantity"
-                                                disabled={item.quantity <= 1}
+                                                disabled={item.quantity <= 1 || loading}
                                             >
                                                 <Minus size={16} />
                                             </button>
@@ -188,10 +217,10 @@ const CartPage = () => {
                                                 {item.quantity}
                                             </span>
                                             <button
-                                                onClick={() => handleQuantityChange(item.id, 1)}
+                                                onClick={() => handleQuantityChange(item.product_id, 1)}
                                                 className="p-2 bg-gray-100 hover:bg-emerald-500 hover:text-white transition-all duration-200"
                                                 aria-label="Increase quantity"
-                                                disabled={item.quantity >= item.stock}
+                                                disabled={item.quantity >= item.stock || loading}
                                             >
                                                 <Plus size={16} />
                                             </button>
@@ -204,8 +233,9 @@ const CartPage = () => {
                                             ₹{(item.price * item.quantity).toFixed(2)}
                                         </p>
                                         <button
-                                            onClick={() => handleRemoveItem(item.id)}
+                                            onClick={() => handleRemoveItem(item.product_id)}
                                             className="mt-2 text-red-500 hover:text-red-700 transition-colors flex items-center text-sm ml-auto"
+                                            disabled={loading}
                                         >
                                             <Trash2 size={16} className="mr-1" />
                                             Remove
@@ -218,7 +248,6 @@ const CartPage = () => {
                     
                     {/* Continue Shopping Button */}
                     <div className="pt-4 flex justify-between">
-                         {/* ⬅️ Updated onClick to use the new handler */}
                          <button 
                             onClick={handleContinueShopping}
                             className="text-emerald-600 font-semibold hover:text-emerald-800 flex items-center transition-colors"
