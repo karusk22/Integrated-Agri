@@ -11,11 +11,11 @@ export default function HomePage() {
   return (
     <>
         <Navbar/>
-        <div className='fixed right-5 bottom-20 max-md:bottom-10 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 py-2 px-5 rounded-3xl z-20'>
+        {/* <div className='fixed right-5 bottom-20 max-md:bottom-10 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 py-2 px-5 rounded-3xl z-20'>
             <Link to="/chatbot">
                 <img src={chatboticon} alt="" className=''/>
             </Link>
-        </div>
+        </div> */}
         <div className="font-sans text-gray-800">
         {/* Hero Section */}
         <div className="relative h-[500px] flex flex-col items-center justify-center p-6 md:p-12">
