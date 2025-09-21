@@ -217,7 +217,7 @@ const RentalPage = ({ rentals: propRentals }) => {
                 </header>
                 
                 <main className="max-w-7xl mx-auto">
-                    {/* Optional Search Bar */}
+                    {/* Optional Search Bar
                     <div className="max-w-4xl mx-auto mb-12">
                         <div className="bg-white/70 backdrop-blur-md rounded-3xl p-3 shadow-xl flex items-center">
                             <Search className="ml-4 text-gray-400" size={20} />
@@ -229,7 +229,7 @@ const RentalPage = ({ rentals: propRentals }) => {
                                 className="w-full pl-3 pr-4 py-2 bg-transparent focus:outline-none"
                             />
                         </div>
-                    </div>
+                    </div> */}
                     
                     {loading && <div className="text-center py-16 font-semibold">Loading...</div>}
                     {!loading && (

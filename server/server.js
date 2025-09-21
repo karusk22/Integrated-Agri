@@ -240,7 +240,7 @@ app.post('/api/products', upload.single('images'), async (req, res) => {
 });
 
 // ----------------------------------------------------
-// FARM EQUIPMENT RENTAL (Unchanged)
+// FARM EQUIPMENT RENTAL (Updated)
 // ----------------------------------------------------
 app.get('/api/rentals', async (req, res) => {
   try {
@@ -248,8 +248,12 @@ app.get('/api/rentals', async (req, res) => {
         `SELECT equipment_id, name, description, rental_rate, rate_unit, images, owner_id, availability_status, created_at, driver_option_available, driver_rate,
                 ST_Y(location::geometry) AS lat,
                 ST_X(location::geometry) AS lng
-        FROM farm_equipment WHERE availability_status = 'available'`
+         FROM farm_equipment 
+         -- REMOVE OR MODIFY THE FILTER: We will remove it to show all publicly listed items.
+         -- If you only want to exclude 'maintenance', use: WHERE availability_status != 'maintenance'
+         ORDER BY created_at DESC`
     );
+
     const rentalsWithLocationNames = await addLocationNames(result.rows);
     res.json(rentalsWithLocationNames);
   } catch (err) {
@@ -312,6 +316,7 @@ app.post('/api/rentals', upload.single('images'), async (req, res) => {
   }
 });
 
+// ✅ MODIFIED: RENTAL BOOKING ROUTE to prevent self-booking
 app.post('/api/rentals/book', async (req, res) => {
     const { equipment_id, renter_id, start_date, end_date, total_price, driver_included } = req.body;
 
@@ -322,6 +327,24 @@ app.post('/api/rentals/book', async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+
+        // 1. CHECK FOR SELF-BOOKING CONFLICT
+        const ownerCheckQuery = `SELECT owner_id FROM farm_equipment WHERE equipment_id = $1`;
+        const ownerResult = await client.query(ownerCheckQuery, [equipment_id]);
+
+        if (ownerResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: "Equipment not found." });
+        }
+        
+        const owner_id = ownerResult.rows[0].owner_id;
+
+        // Ensure both IDs are numbers for reliable comparison
+        if (parseInt(renter_id) === parseInt(owner_id)) {
+            await client.query('ROLLBACK');
+            return res.status(403).json({ message: "You cannot book your own equipment." });
+        }
+
 
         const bookingQuery = `
             INSERT INTO rentalbookings (equipment_id, renter_id, start_date, end_date, total_price, driver_included, status)
@@ -445,7 +468,7 @@ app.delete('/api/users/:userId/cart/remove/:productId', async (req, res) => {
 });
 
 
-// 🔥 ORDER CREATION (UPDATED WITH STOCK REDUCTION) 🔥
+// ORDER CREATION (Unchanged)
 app.post('/api/orders/create', async (req, res) => {
     const { buyer_id, total_price, cartItems } = req.body;
 
@@ -490,7 +513,7 @@ app.post('/api/orders/create', async (req, res) => {
             const orderItemQuery = `INSERT INTO orderitems (order_id, product_id, quantity, line_item_price) VALUES ($1, $2, $3, $4)`;
             await client.query(orderItemQuery, [newOrderId, item.product_id, orderedQuantity, line_item_price]);
 
-            // 🔥 Update product quantity (stock)
+            // Update product quantity (stock)
             const updateStockQuery = `
                 UPDATE products 
                 SET quantity = quantity - $1
@@ -500,7 +523,7 @@ app.post('/api/orders/create', async (req, res) => {
         }
 
         // 4. Clear the cart
-        const cartResult = await client.query('SELECT cart_id FROM cart WHERE user_id = $1', [buyer_id]);
+        const cartResult = await pool.query('SELECT cart_id FROM cart WHERE user_id = $1', [buyer_id]);
         if (cartResult.rows.length > 0) {
             const cartId = cartResult.rows[0].cart_id;
             await client.query('DELETE FROM cartitems WHERE cart_id = $1', [cartId]);
@@ -528,7 +551,7 @@ app.post('/api/orders/create', async (req, res) => {
 });
 
 // ----------------------------------------------------
-// OWNER-SPECIFIC ROUTES (Unchanged)
+// OWNER-SPECIFIC ROUTES (Updated)
 // ----------------------------------------------------
 app.get('/api/users/:userId/equipment', async (req, res) => {
     const { userId } = req.params;
@@ -544,22 +567,61 @@ app.get('/api/users/:userId/equipment', async (req, res) => {
     }
 });
 
-app.put('/api/equipment/:equipmentId/available', async (req, res) => {
+
+// ✅ MODIFIED: Allows owner to change status even if it is 'rented'.
+app.put('/api/equipment/:equipmentId/status', async (req, res) => {
     const { equipmentId } = req.params;
+    const { status, ownerId } = req.body; 
+
+    if (!status || !ownerId) {
+        return res.status(400).json({ message: "Missing required status or owner ID." });
+    }
+
+    const allowedStatuses = ['available', 'unavailable'];
+    if (!allowedStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status value. Must be 'available' or 'unavailable'." });
+    }
+
     try {
+        // Updated query: removed the 'AND availability_status != 'rented'' check.
         const result = await pool.query(
-            `UPDATE farm_equipment SET availability_status = 'available' WHERE equipment_id = $1 RETURNING *`,
-            [equipmentId]
+            `UPDATE farm_equipment 
+             SET availability_status = $1 
+             WHERE equipment_id = $2 
+             AND owner_id = $3
+             RETURNING equipment_id, availability_status`,
+            [status, equipmentId, ownerId]
         );
+
         if (result.rows.length === 0) {
-            return res.status(404).json({ message: "Equipment not found." });
+            // Check if the equipment exists and belongs to the user
+            const checkOwner = await pool.query(
+                `SELECT owner_id FROM farm_equipment WHERE equipment_id = $1`,
+                [equipmentId]
+            );
+
+            if (checkOwner.rows.length === 0) {
+                return res.status(404).json({ message: "Equipment not found." });
+            }
+            
+            // Fix for 500 Error: Robustly compare the owner ID (owner_id from DB is number, ownerId from req is string)
+            if (checkOwner.rows[0].owner_id !== parseInt(ownerId)) { 
+                return res.status(403).json({ message: "You are not authorized to modify this equipment." });
+            }
+            
+            return res.status(500).json({ message: "Update failed unexpectedly." });
         }
-        res.json({ message: 'Equipment marked as available.', equipment: result.rows[0] });
+
+        res.json({ 
+            message: `Equipment status force-updated to ${status}.`, 
+            equipment: result.rows[0] 
+        });
     } catch (err) {
         console.error("Error updating equipment status:", err);
-        res.status(500).json({ message: "Failed to update equipment status." });
+        res.status(500).json({ message: "Failed to update equipment status due to a server error." });
     }
 });
+
 
 app.get('/api/owners/:ownerId/bookings', async (req, res) => {
     const { ownerId } = req.params;

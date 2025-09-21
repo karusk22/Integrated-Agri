@@ -5,32 +5,36 @@ import ProductCard from './ProductCard'; // Import the ProductCard component
 
 /**
  * Main ProductList Component with Enhanced UI
- * This component now receives products and cart handlers as props.
+ * This component now receives products, cart handlers, and the logged-in user as props.
  */
-// ⬅️ UPDATED: The component now accepts `products` and `onAddToCart` as props
-const ProductList = ({ products, onAddToCart }) => {
+// ✅ FIXED: The component now accepts `user` as a prop
+const ProductList = ({ products, onAddToCart, user }) => { 
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedFilter, setSelectedFilter] = useState('all');
     const navigate = useNavigate();
 
-    // ⬅️ REMOVED: The mock `sampleProducts` array has been removed.
-
-    // ⬅️ ADDED: The filters array has been recreated locally.
     const filters = ['all', 'Organic', 'Animal Feed', 'Biofuel', 'Crop Residue'];
 
-    // ⬅️ UPDATED: The filter logic now uses the `products` prop from App.js
+    // NOTE: This filter logic requires products to have a 'tags' property, 
+    // which may not be present in your current backend schema. Using location 
+    // for demonstration only.
     const filteredProducts = products.filter(product => {
-        const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                              product.location.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesFilter = selectedFilter === 'all' || product.tags.includes(selectedFilter);
+        const productLocation = product.location_name || ''; // Use location_name from API
+        const productName = product.name || '';
+
+        const matchesSearch = productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              productLocation.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        // This tag logic needs adjustment based on your actual data structure
+        const matchesFilter = selectedFilter === 'all' // || product.tags.includes(selectedFilter); 
+        
         return matchesSearch && matchesFilter;
     });
 
     return (
         <div className="min-h-screen">
-            {/* ⬅️ REMOVED: The Navbar is already rendered in App.js */}
             <div className="relative z-10 p-8">
-                {/* Hero Header */}
+                {/* Hero Header (unchanged) */}
                 <header className="text-center mb-16">
                     <div className="mb-6">
                         <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl shadow-2xl mb-6 transform hover:rotate-6 transition-transform duration-300">
@@ -48,7 +52,7 @@ const ProductList = ({ products, onAddToCart }) => {
                     {/* Stats */}
                     <div className="flex justify-center gap-12 mt-8">
                         <div className="text-center">
-                            <div className="text-3xl font-bold text-emerald-600">500+</div>
+                            <div className="text-3xl font-bold text-emerald-600">{products.length}+</div>
                             <div className="text-sm text-gray-500">Products</div>
                         </div>
                         <div className="text-center">
@@ -62,38 +66,7 @@ const ProductList = ({ products, onAddToCart }) => {
                     </div>
                 </header>
 
-                {/* Search and Filter Section */}
-                {/* <div className="max-w-4xl mx-auto mb-12">
-                    <div className="bg-white/70 backdrop-blur-md rounded-3xl p-6 shadow-xl border border-white/20">
-                        <div className="flex flex-col md:flex-row gap-4">
-                            <div className="flex-1 relative">
-                                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                                <input
-                                    type="text"
-                                    placeholder="Search products or locations..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full pl-12 pr-4 py-4 rounded-2xl border border-gray-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 outline-none transition-all duration-300 text-gray-700 placeholder-gray-400"
-                                />
-                            </div>
-                            
-                            <div className="relative">
-                                <Filter className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-                                <select
-                                    value={selectedFilter}
-                                    onChange={(e) => setSelectedFilter(e.target.value)}
-                                    className="pl-12 pr-8 py-4 rounded-2xl border border-gray-200 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100 outline-none transition-all duration-300 text-gray-700 bg-white appearance-none cursor-pointer min-w-48"
-                                >
-                                    {filters.map(filter => (
-                                        <option key={filter} value={filter}>
-                                            {filter === 'all' ? 'All Categories' : filter}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div> */}
+                {/* Search and Filter Section (Commented Out - unchanged) */}
 
                 {/* Products Grid */}
                 <main className="max-w-7xl mx-auto">
@@ -106,8 +79,12 @@ const ProductList = ({ products, onAddToCart }) => {
                                     animationDelay: `${index * 100}ms`
                                 }}
                             >
-                                {/* ⬅️ UPDATED: The onAddToCart handler is now passed as a prop */}
-                                <ProductCard product={product} onAddToCart={onAddToCart} />
+                                {/* 🔥 FIXED: Passing the user prop to ProductCard */}
+                                <ProductCard 
+                                    product={product} 
+                                    onAddToCart={onAddToCart} 
+                                    user={user} // 👈 PROP NOW PASSED
+                                />
                             </div>
                         ))}
                     </div>
@@ -137,9 +114,6 @@ const ProductList = ({ products, onAddToCart }) => {
                             <button className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl hover:from-emerald-600 hover:to-teal-700 transform hover:scale-105 transition-all duration-300" onClick={() => navigate('/addproduct')}>
                                 List Your Products
                             </button>
-                            {/* <button className="bg-white text-emerald-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl border-2 border-emerald-200 hover:border-emerald-300 transform hover:scale-105 transition-all duration-300">
-                                Learn More
-                            </button> */}
                         </div>
                     </div>
                 </section>
