@@ -1,39 +1,32 @@
 import React, { useState } from 'react';
-import { Star, MapPin, Award, Package, Image, ShoppingCart } from 'lucide-react';
+import { Star, MapPin, Award, Package, ShoppingCart } from 'lucide-react';
 
 /**
  * ProductCard Component
- * Enhanced with beautiful animations and modern design
+ * Simplified with a single "Add to Cart" button and corrected functionality.
  */
 const ProductCard = ({ product, onAddToCart }) => {
-    // Add a check to handle cases where the product prop is undefined
     if (!product) {
         return null;
     }
 
-    const [isHovered, setIsHovered] = useState(false);
-    const [itemQuantity, setItemQuantity] = useState(1); // ⬅️ New state for quantity to add
+    const [itemQuantity, setItemQuantity] = useState(1);
 
-    // Helper function to get the first image URL from the array
     const getProductImage = () => {
         if (product.images && product.images.length > 0) {
-            // Correctly form a full URL for the image
             return `http://localhost:3001${product.images[0]}`;
         }
         return 'https://placehold.co/600x400/E5E7EB/4B5563?text=No+Image';
     };
 
     const handleQuantityChange = (e) => {
-        // Ensure the value is a number and is not less than 1
-        const value = Math.max(1, parseInt(e.target.value, 10));
+        const value = Math.max(1, parseInt(e.target.value, 10) || 1);
         setItemQuantity(value);
     };
 
     return (
         <div 
-            className="group bg-white rounded-3xl shadow-lg hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-500 ease-out overflow-hidden border border-gray-100 h-full"
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
+            className="group bg-white rounded-3xl shadow-lg hover:shadow-2xl transform hover:-translate-y-2 transition-all duration-500 ease-out overflow-hidden border border-gray-100 flex flex-col h-full"
         >
             {/* Product Image with Gradient Overlay */}
             <div className="relative h-64 overflow-hidden">
@@ -58,65 +51,39 @@ const ProductCard = ({ product, onAddToCart }) => {
                         Premium
                     </div>
                 </div>
-
-                {/* Hover Overlay */}
-                <div className={`absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent z-20 transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-0'}`}>
-                    <div className="absolute bottom-4 left-4 right-4 text-white">
-                        <button className="w-full bg-white/20 backdrop-blur-md border border-white/30 text-white font-semibold py-3 rounded-xl hover:bg-white/30 transition-all duration-300"
-                                onClick={() => onAddToCart(product, itemQuantity)}>
-                            Add to Cart
-                        </button>
-                    </div>
-                </div>
             </div>
 
             {/* Card Content */}
-            <div className="p-6">
-                {/* Product Title */}
+            <div className="p-6 flex-grow flex flex-col">
                 <h3 className="text-xl font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-emerald-700 transition-colors duration-300">
                     {product.name}
                 </h3>
 
-                {/* Location */}
                 <div className="flex items-center text-gray-500 mb-3">
                     <MapPin size={14} className="mr-2 text-emerald-500" />
-                    <span className="text-sm">{product.location_name}</span>
+                    <span className="text-sm">{product.location_name || 'Location not specified'}</span>
                 </div>
 
-                {/* Rating */}
                 <div className="flex items-center mb-4">
                     <div className="flex">
                         {[...Array(5)].map((_, i) => (
                             <Star
                                 key={i}
                                 size={16}
-                                className={
-                                    i < product.rating
-                                        ? "text-yellow-400 fill-yellow-400"
-                                        : "text-gray-200"
-                                }
+                                className={i < (product.rating || 0) ? "text-yellow-400 fill-yellow-400" : "text-gray-200"}
                             />
                         ))}
                     </div>
                     <span className="ml-2 text-sm text-gray-600 font-medium">
-                        {product.rating}.0 ({product.reviews})
+                        {product.rating || 'N/A'} ({product.reviews || 0} reviews)
                     </span>
                 </div>
-
-                {/* Tags */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                    {product.tags && product.tags.map((tag, i) => (
-                        <span
-                            key={i}
-                            className="bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-700 px-3 py-1 text-xs font-semibold rounded-full border border-emerald-200"
-                        >
-                            {tag}
-                        </span>
-                    ))}
-                </div>
+                
+                {/* Spacer to push content to the bottom */}
+                <div className="flex-grow"></div>
 
                 {/* Quantity and Action */}
-                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-4">
                     <div className="flex items-center text-gray-700 text-sm">
                         <Package size={16} className="mr-2 text-emerald-500" />
                         <span>Available: <span className="font-bold">{product.quantity}</span> {product.unit}</span>
@@ -134,7 +101,7 @@ const ProductCard = ({ product, onAddToCart }) => {
                             onClick={() => onAddToCart(product, itemQuantity)}
                         >
                             <ShoppingCart size={16} className="mr-2" />
-                            Add to Cart
+                            <span>Add</span>
                         </button>
                     </div>
                 </div>

@@ -9,9 +9,9 @@ import chatboticon from '../../assets/background/icons8-chatbot3-48.png';
 // The main HomePage component, now with an updated theme and more content.
 export default function HomePage() {
   return (
+    
     <>
-
-        <div className='fixed right-5 bottom-20 max-md:bottom-10 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 py-2 px-5 rounded-3xl z-20'>
+        
 
    
         {/* <div className='fixed right-5 bottom-20 max-md:bottom-10 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 py-2 px-5 rounded-3xl z-20'>
@@ -131,11 +131,11 @@ export default function HomePage() {
   );
 };
 
-// Footer component.
+
 const Footer = () => (
   <footer className="bg-gray-800 text-white p-8 text-center">
     <div className="max-w-7xl mx-auto">
       <p>&copy; 2024 Sandhai. All rights reserved.</p>
     </div>
   </footer>
-);
+); 
