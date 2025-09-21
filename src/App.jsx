@@ -78,7 +78,7 @@ const AppContent = () => {
     loadInitialData();
   }, [fetchProducts, fetchRentals, fetchCartItems]);
 
-  const handleAddToCart = async (product) => {
+  const handleAddToCart = async (product, quantity) => {
     if (!userId) {
       navigate('/login');
       return;
@@ -87,7 +87,7 @@ const AppContent = () => {
       const response = await fetch(`http://localhost:3001/api/users/${userId}/cart/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId: product.product_id, quantity: 1 }),
+        body: JSON.stringify({ productId: product.product_id, quantity }),
       });
       if (!response.ok) throw new Error('Failed to add item to cart');
       await fetchCartItems();
@@ -96,8 +96,10 @@ const AppContent = () => {
     }
   };
 
+  // 🔥 UPDATED: This function is called after checkout and now triggers product re-fetch.
   const handleUpdateCart = async () => {
     await fetchCartItems();
+    await fetchProducts(); // 👈 THIS IS THE CRITICAL LINE TO UPDATE STOCK DISPLAY
   };
 
   const handleAddProduct = async (newProduct) => {
@@ -106,13 +108,16 @@ const AppContent = () => {
       return;
     }
     try {
+      // NOTE: Your original logic sends location as an object, but your backend expects a locationName string.
+      // You may need to adjust this in AddProducts component or here if your backend logic for geocoding is to be followed.
       const response = await fetch('http://localhost:3001/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...newProduct,
           seller_id: userId,
-          location: { latitude: 11.016844, longitude: 76.955833 }
+          // Assuming locationName is passed from form or derived
+          locationName: newProduct.locationName || 'Coimbatore, India' 
         }),
       });
       if (!response.ok) throw new Error('Failed to add product');
@@ -135,7 +140,8 @@ const AppContent = () => {
         body: JSON.stringify({
           ...newRental,
           owner_id: userId,
-          location: { latitude: 11.016844, longitude: 76.955833 }
+          // Assuming locationName is passed from form or derived
+          locationName: newRental.locationName || 'Coimbatore, India' 
         }),
       });
       if (!response.ok) throw new Error('Failed to add rental');
@@ -179,9 +185,19 @@ const AppContent = () => {
         <Route path="/addproduct" element={<AddProduct onAddProduct={handleAddProduct} />} />
         <Route path="/addrentalproduct" element={<AddRentalProduct onAddRental={handleAddRental} />} />
         <Route path="/chatbot" element={<ChatBotMenu />} />
-        <Route path="/cartpage" element={<CartPage cartItems={cartItems} onUpdateCart={handleUpdateCart} />} />
+        <Route 
+            path="/cartpage" 
+            element={
+                <CartPage 
+                    user={user} // Pass user down for checkout
+                    cartItems={cartItems} 
+                    onUpdateCart={handleUpdateCart} // Updated function handles both cart and product re-fetch
+                />
+            } 
+        />
         <Route path="/profile" element={<ProfilePage user={user} />} />
       </Routes>
+      <Footer />
     </div>
   );
 };
