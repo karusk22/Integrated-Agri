@@ -1,288 +1,310 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Minus, Plus, Trash2, MapPin, Package, Percent } from 'lucide-react';
-
-const TAX_RATE = 0.05; // 5% tax
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 /**
- * CartPage Component
- * A two-column layout with cart items and order summary.
+ * SignUpForm Component
+ * A complete sign-up form with input fields for user details and a profile picture upload.
  */
-const CartPage = ({ user, cartItems: initialCartItems, onUpdateCart }) => {
+export default function SignUpForm() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const fileInputRef = useRef(null); // Ref to programmatically click the hidden file input
 
-    const [cartItems, setCartItems] = useState(initialCartItems);
-    const [couponCode, setCouponCode] = useState('');
-    const [discount, setDiscount] = useState(0);
-    const [shippingCost, setShippingCost] = useState(120.00); // Fixed or estimated shipping
-    const [loading, setLoading] = useState(false);
-
+    // Scroll to the top of the page on component mount or location change.
     useEffect(() => {
-      setCartItems(initialCartItems);
-    }, [initialCartItems]);
+        window.scrollTo(0, 0);
+    }, [location.pathname]);
 
-    // --- Core Cart Logic ---
+    const [formData, setFormData] = useState({
+        fullName: '',
+        email: '',
+        phone: '',
+        password: '',
+        confirmPassword: '',
+        userRole: [],
+        location: '',
+    });
 
-    // ✅ CORRECTED: This function now updates the UI instantly for a better user experience.
-    const handleQuantityChange = async (productId, change) => {
-        if (!user) {
-            navigate('/login');
-            return;
-        }
+    const [profilePicture, setProfilePicture] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState('');
 
-        const currentItem = cartItems.find(item => item.product_id === productId);
-        if (!currentItem) return;
+    // Handler for text input changes
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
 
-        const newQty = currentItem.quantity + change;
+    // Handler for user role selection
+    const handleRoleClick = (role) => {
+        setFormData(prev => {
+            const newRoles = prev.userRole.includes(role)
+                ? prev.userRole.filter(r => r !== role)
+                : [role]; // Allows only one role to be selected at a time
+            return { ...prev, userRole: newRoles };
+        });
+    };
 
-        if (newQty > currentItem.stock) {
-            alert('Cannot add more than available stock.');
-            return;
-        }
-        
-        const originalCart = [...cartItems]; // Save original state for rollback
-
-        // Optimistically update the UI
-        if (newQty <= 0) {
-            // If quantity is zero or less, filter it out from the view
-            setCartItems(prevItems => prevItems.filter(item => item.product_id !== productId));
-        } else {
-            // Otherwise, update the quantity of the specific item
-            setCartItems(prevItems => 
-                prevItems.map(item => 
-                    item.product_id === productId ? { ...item, quantity: newQty } : item
-                )
-            );
-        }
-
-        try {
-            // Update the backend
-            if (newQty > 0) {
-                const response = await fetch(`http://localhost:3001/api/users/${user.user_id}/cart/update/${productId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ quantity: newQty }),
-                });
-                if (!response.ok) throw new Error('Failed to update item quantity on server');
-            } else {
-                // If quantity reached zero, send a remove request instead
-                const response = await fetch(`http://localhost:3001/api/users/${user.user_id}/cart/remove/${productId}`, {
-                    method: 'DELETE',
-                });
-                if (!response.ok) throw new Error('Failed to remove item on server');
-            }
-            // Sync with parent component after successful API call
-            await onUpdateCart();
-        } catch (err) {
-            console.error('Error updating cart, rolling back UI:', err);
-            // If the API call fails, revert the UI to its original state
-            setCartItems(originalCart);
-            alert('There was an issue updating your cart. Please try again.');
+    // Handler for when a picture is selected
+    const handlePictureChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setProfilePicture(file); // Store the file object
+            setPreviewUrl(URL.createObjectURL(file)); // Create a temporary URL for preview
         }
     };
 
-    // ✅ CORRECTED: This function also uses an optimistic update for instant removal.
-    const handleRemoveItem = async (productId) => {
-        if (!user) {
-            navigate('/login');
+    // Handles the form submission logic.
+    const handleSubmit = async (e) => {
+        e.preventDefault(); // Prevent default form submission behavior
+
+        if (formData.password !== formData.confirmPassword) {
+            setMessage('Passwords do not match!');
             return;
         }
 
-        const originalCart = [...cartItems]; // Save for rollback
-
-        // Optimistically remove the item from the UI
-        setCartItems(prevItems => prevItems.filter(item => item.product_id !== productId));
-
-        try {
-            const response = await fetch(`http://localhost:3001/api/users/${user.user_id}/cart/remove/${productId}`, {
-                method: 'DELETE',
-            });
-            if (!response.ok) throw new Error('Failed to remove item from server');
-            // Sync with parent
-            await onUpdateCart();
-        } catch (err) {
-            console.error('Error removing item, rolling back UI:', err);
-            // Revert UI on error
-            setCartItems(originalCart);
-            alert('There was an issue removing the item. Please try again.');
-        }
-    };
-
-    // Function to apply coupon (placeholder logic)
-    const applyCoupon = async () => {
-        if (!couponCode) return;
         setLoading(true);
+        setMessage('');
+
+        // Prepare the data to be sent using FormData for file upload
+        const submissionData = new FormData();
+        submissionData.append('username', formData.fullName);
+        submissionData.append('email', formData.email);
+        submissionData.append('phone_number', formData.phone);
+        submissionData.append('password', formData.password);
+        submissionData.append('user_type', formData.userRole[0]);
+        submissionData.append('locationName', formData.location);
+
+        if (profilePicture) {
+            // The key 'profilePicture' must match what your backend expects (e.g., using Multer)
+            submissionData.append('profilePicture', profilePicture);
+        }
+
         try {
-            if (couponCode.toUpperCase() === 'AGRI10') {
-                setDiscount(0.10); // 10% discount
-                alert('Coupon applied successfully! You got 10% off.');
+            const response = await fetch('http://localhost:3001/api/signup', {
+                method: 'POST',
+                // IMPORTANT: Do NOT set the 'Content-Type' header.
+                // The browser will automatically set it to 'multipart/form-data' with the correct boundary.
+                body: submissionData,
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                setMessage('Account created successfully! Redirecting to login...');
+                setTimeout(() => {
+                    navigate('/login');
+                    window.scrollTo(0, 0);
+                }, 1500);
             } else {
-                setDiscount(0);
-                alert('Invalid coupon code. Try AGRI10.');
+                setMessage(result.message || 'Registration failed. Please try again.');
             }
-        } catch (err) {
-            console.error("Error applying coupon:", err);
-            alert("An error occurred while applying the coupon.");
+        } catch (error) {
+            console.error('Network error:', error);
+            setMessage('An error occurred. Please check your network connection.');
         } finally {
             setLoading(false);
         }
     };
 
-    // Memoized function for calculating all totals
-    const totals = useMemo(() => {
-        const subtotal = cartItems.reduce((acc, item) => acc + (parseFloat(item.price) * item.quantity), 0);
-        const discountAmount = subtotal * discount;
-        const subtotalAfterDiscount = subtotal - discountAmount;
-        const taxAmount = subtotalAfterDiscount * TAX_RATE;
-        const grandTotal = subtotalAfterDiscount + taxAmount + shippingCost;
-
-        return {
-            subtotal,
-            discountAmount,
-            taxAmount,
-            grandTotal,
-        };
-    }, [cartItems, discount, shippingCost]);
-
-    const handleContinueShopping = () => {
-        navigate('/products');
-        window.scrollTo(0, 0);
-    };
-
-    const getProductImage = (dbPath) => {
-        if (dbPath && dbPath.length > 0) {
-            return `http://localhost:3001${dbPath[0]}`;
-        }
-        return 'https://placehold.co/150/10B981/FFFFFF?text=Product';
-    };
-
-    // --- Component Rendering ---
-
-    if (cartItems.length === 0) {
-        return (
-            <div className="text-center py-20">
-                <Package size={64} className="text-emerald-500 mx-auto mb-4" />
-                <h2 className="text-3xl font-bold text-gray-800">Your Cart is Empty!</h2>
-                <p className="text-gray-500 mt-2">Time to fill it with fresh agri-goods.</p>
-                <button 
-                    onClick={handleContinueShopping}
-                    className="mt-6 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-3 px-8 rounded-full transition-colors duration-300"
-                >
-                    Continue Shopping
-                </button>
-            </div>
-        );
-    }
+    const roles = [
+        { value: 'farmer', label: 'Farmer', emoji: '🧑‍🌾' },
+        { value: 'equipment-owner', label: 'Equipment Owner', emoji: '🚜' },
+    ];
 
     return (
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-            <h1 className="text-4xl font-extrabold text-gray-900 mb-8 border-b pb-4">
-                Your Harvest Cart ({cartItems.length} Items)
-            </h1>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* === Cart Items Column === */}
-                <div className="lg:col-span-2 space-y-6">
-                    {cartItems.map((item) => (
+        // Main container for the form with a vibrant, themed background.
+        <div className="min-h-screen flex items-center justify-center pt-16 pb-16 font-sans bg-gray-100">
+            {/* Form container with card-like styling, using a subtle shadow and rounded corners. */}
+            <div className="bg-white p-10 rounded-2xl shadow-xl w-full max-w-md mx-auto">
+                {/* Header section of the form with a themed icon. */}
+                <div className="text-center mb-6">
+                    <div className="text-4xl mb-4 text-green-800">🌱</div>
+                    <h1 className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent tracking-tight mb-2">
+                        Create Your Account
+                    </h1>
+                    <p className="text-gray-500 text-sm">
+                        Join our community of farmers and agri-partners.
+                    </p>
+                </div>
+
+                {/* The sign-up form itself. */}
+                <form onSubmit={handleSubmit}>
+                    {/* Profile Picture Input Section */}
+                    <div className="mb-6 flex flex-col items-center">
+                        <label className="block text-gray-700 text-sm font-semibold mb-2">
+                            Profile Picture (Optional)
+                        </label>
                         <div
-                            key={item.cart_item_id}
-                            className="flex flex-col sm:flex-row bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden p-4 border border-gray-100"
+                            className="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center cursor-pointer border-2 border-dashed border-gray-400 hover:border-green-500 transition-all duration-300"
+                            onClick={() => fileInputRef.current.click()} // Clicks the hidden input
                         >
-                            <div className="w-full sm:w-40 h-32 sm:h-auto overflow-hidden rounded-lg sm:mr-6 flex-shrink-0">
-                                <img
-                                    src={getProductImage(item.images)}
-                                    alt={item.name}
-                                    className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-500"
-                                />
-                            </div>
-                            <div className="flex-grow pt-4 sm:pt-0">
-                                <h2 className="text-xl font-bold text-gray-900 line-clamp-2 hover:text-emerald-600 transition-colors">
-                                    {item.name}
-                                </h2>
-                                <div className="flex items-center text-sm text-gray-500 my-1">
-                                    <MapPin size={14} className="mr-1 text-emerald-500" />
-                                    <span>From {item.location_name || 'Location not specified'}</span>
-                                </div>
-                                <p className="text-lg font-semibold text-gray-700 mt-2">
-                                    Unit Price: ₹{item.price ? parseFloat(item.price).toFixed(2) : '0.00'} / {item.unit}
-                                </p>
-                                <div className="flex items-center justify-between mt-4 border-t pt-4">
-                                    <div className="flex items-center space-x-3">
-                                        <label className="text-gray-600 font-medium">Quantity:</label>
-                                        <div className="flex items-center border border-gray-300 rounded-full overflow-hidden">
-                                            <button
-                                                onClick={() => handleQuantityChange(item.product_id, -1)}
-                                                className="p-2 bg-gray-100 hover:bg-red-500 hover:text-white transition-all duration-200"
-                                                aria-label="Decrease quantity"
-                                                disabled={loading}
-                                            >
-                                                <Minus size={16} />
-                                            </button>
-                                            <span className="w-10 text-center font-bold text-gray-800">
-                                                {item.quantity}
-                                            </span>
-                                            <button
-                                                onClick={() => handleQuantityChange(item.product_id, 1)}
-                                                className="p-2 bg-gray-100 hover:bg-emerald-500 hover:text-white transition-all duration-200"
-                                                aria-label="Increase quantity"
-                                                disabled={item.quantity >= item.stock || loading}
-                                            >
-                                                <Plus size={16} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-2xl font-extrabold text-emerald-600">
-                                            ₹{(parseFloat(item.price) * item.quantity).toFixed(2)}
-                                        </p>
-                                        <button
-                                            onClick={() => handleRemoveItem(item.product_id)}
-                                            className="mt-2 text-red-500 hover:text-red-700 transition-colors flex items-center text-sm ml-auto"
-                                            disabled={loading}
-                                        >
-                                            <Trash2 size={16} className="mr-1" />
-                                            Remove
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                            {previewUrl ? (
+                                <img src={previewUrl} alt="Profile Preview" className="w-full h-full rounded-full object-cover" />
+                            ) : (
+                                <svg className="w-12 h-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                            )}
                         </div>
-                    ))}
-                    <div className="pt-4 flex justify-between">
-                         <button 
-                            onClick={handleContinueShopping}
-                            className="text-emerald-600 font-semibold hover:text-emerald-800 flex items-center transition-colors"
-                        >
-                            &larr; Continue Shopping
-                        </button>
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handlePictureChange}
+                            className="hidden" // The input is hidden and controlled programmatically
+                            accept="image/png, image/jpeg, image/jpg"
+                        />
                     </div>
-                </div>
-                {/* === Order Summary Column === */}
-                <div className="lg:col-span-1">
-                    <div className="sticky top-24 bg-white rounded-xl shadow-2xl p-6 border border-emerald-100">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-5 pb-3 border-b">Order Summary</h2>
-                        <div className="space-y-3 mb-6 text-lg">
-                            <div className="flex justify-between"><span className="text-gray-600">Subtotal:</span><span className="font-medium">₹{totals.subtotal.toFixed(2)}</span></div>
-                            <div className="flex justify-between"><span className="text-gray-600">Discount:</span><span className="font-medium text-red-500">- ₹{totals.discountAmount.toFixed(2)}</span></div>
-                            <div className="flex justify-between"><span className="text-gray-600">Shipping Estimate:</span><span className="font-medium">₹{shippingCost.toFixed(2)}</span></div>
-                            <div className="flex justify-between border-b pb-3"><span className="text-gray-600">Estimated Tax ({TAX_RATE * 100}%):</span><span className="font-medium">₹{totals.taxAmount.toFixed(2)}</span></div>
-                            <div className="flex justify-between pt-3 text-xl font-extrabold text-emerald-700"><span>Grand Total:</span><span>₹{totals.grandTotal.toFixed(2)}</span></div>
-                        </div>
-                        <div className="mt-6 mb-6">
-                            <label htmlFor="coupon" className="block text-sm font-medium text-gray-700 mb-2">Apply Coupon Code:</label>
-                            <div className="flex">
-                                <input type="text" id="coupon" value={couponCode} onChange={(e) => setCouponCode(e.target.value)} placeholder="Enter code" className="flex-grow p-3 border border-gray-300 rounded-l-lg focus:ring-emerald-500 focus:border-emerald-500 transition-shadow"/>
-                                <button onClick={applyCoupon} className="bg-emerald-500 text-white px-5 py-3 rounded-r-lg font-semibold hover:bg-emerald-600 transition-colors flex items-center"><Percent size={18} className="mr-1" /> Apply</button>
-                            </div>
-                        </div>
-                        <button className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xl font-bold py-4 rounded-xl shadow-lg hover:shadow-xl hover:from-emerald-600 hover:to-teal-700 transform hover:scale-[1.01] transition-all duration-300">
-                            Proceed to Checkout
-                        </button>
+
+                    {/* Full Name input field. */}
+                    <div className="mb-4">
+                        <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="fullName">
+                            Full Name
+                        </label>
+                        <input
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200"
+                            type="text"
+                            id="fullName"
+                            name="fullName"
+                            value={formData.fullName}
+                            onChange={handleChange}
+                            placeholder="Enter your full name"
+                            required
+                        />
                     </div>
-                </div>
+
+                    {/* Email input field. */}
+                    <div className="mb-4">
+                        <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="email">
+                            Email Address
+                        </label>
+                        <input
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200"
+                            type="email"
+                            id="email"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            placeholder="you@example.com"
+                            required
+                        />
+                    </div>
+
+                    {/* Phone Number input field. */}
+                    <div className="mb-4">
+                        <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="phone">
+                            Phone Number
+                        </label>
+                        <input
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200"
+                            type="tel"
+                            id="phone"
+                            name="phone"
+                            value={formData.phone}
+                            onChange={handleChange}
+                            placeholder="e.g., +91 9876543210"
+                            required
+                        />
+                    </div>
+
+                    {/* Password input field. */}
+                    <div className="mb-4">
+                        <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="password">
+                            Password
+                        </label>
+                        <input
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200"
+                            type="password"
+                            id="password"
+                            name="password"
+                            value={formData.password}
+                            onChange={handleChange}
+                            placeholder="Create a password"
+                            required
+                        />
+                    </div>
+
+                    {/* Confirm Password input field. */}
+                    <div className="mb-4">
+                        <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="confirmPassword">
+                            Confirm Password
+                        </label>
+                        <input
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200"
+                            type="password"
+                            id="confirmPassword"
+                            name="confirmPassword"
+                            value={formData.confirmPassword}
+                            onChange={handleChange}
+                            placeholder="Confirm your password"
+                            required
+                        />
+                    </div>
+
+                    {/* User Role selection using clickable cards. */}
+                    <div className="mb-6">
+                        <label className="block text-gray-700 text-sm font-semibold mb-2">
+                            I am a...
+                        </label>
+                        <div className="grid grid-cols-2 gap-4">
+                            {roles.map(role => (
+                                <div
+                                    key={role.value}
+                                    onClick={() => handleRoleClick(role.value)}
+                                    className={`
+                                        flex flex-col items-center justify-center p-4 rounded-lg
+                                        border-2 cursor-pointer transition-all duration-200
+                                        ${formData.userRole.includes(role.value) ?
+                                            'border-green-600 bg-green-50 shadow-md' :
+                                            'border-gray-300 hover:border-green-400'
+                                        }
+                                    `}
+                                >
+                                    <span className="text-2xl">{role.emoji}</span>
+                                    <span className="text-sm font-medium mt-2 text-center">{role.label}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Location input field. */}
+                    <div className="mb-6">
+                        <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="location">
+                            Location (City/State)
+                        </label>
+                        <input
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 transition duration-200"
+                            type="text"
+                            id="location"
+                            name="location"
+                            value={formData.location}
+                            onChange={handleChange}
+                            placeholder="e.g., New Delhi, Delhi"
+                            required
+                        />
+                    </div>
+
+                    {/* Message display area for success or errors. */}
+                    {message && (
+                        <p className={`text-center font-medium ${message.includes('successfully') ? 'text-green-600' : 'text-red-500'}`}>
+                            {message}
+                        </p>
+                    )}
+
+                    {/* Submit button with loading state. */}
+                    <button
+                        type="submit"
+                        className="w-full bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold py-3 px-4 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 hover:from-emerald-600 hover:to-teal-700 focus:outline-none disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        disabled={loading}
+                    >
+                        {loading ? 'Creating Account...' : 'Create My Account'}
+                    </button>
+                </form>
+
+                {/* Optional footer for logging in. */}
+                <p className="mt-6 text-center text-gray-500 text-sm">
+                    Already have an account? <Link to="/login" className="text-green-600 hover:underline font-semibold">Log in</Link>
+                </p>
             </div>
         </div>
     );
-};
-
-export default CartPage;
-
+}
