@@ -3,13 +3,27 @@ const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const bcrypt = require('bcryptjs'); 
-const fetch = require("node-fetch");
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+// const { Client: GoogleClient, GeocodeResponseStatus } = require("@googlemaps/google-maps-services-js"); // REMOVED
+
+// 🔑 NEW IMPORT: OpenCage API Client
+const opencage = require('opencage-api-client');
 
 const app = express();
 const port = process.env.PORT || 3001;
+
+// ----------------------------------------------------
+// OPEN CAGE API KEY INITIALIZATION
+// ----------------------------------------------------
+const OPENCAGE_API_KEY = process.env.OPENCAGE_API_KEY; 
+
+if (!OPENCAGE_API_KEY) {
+    console.warn("⚠️ WARNING: OPENCAGE_API_KEY is missing. Geocoding functions will not work.");
+}
+// ----------------------------------------------------
+
 
 // Middleware
 app.use(cors());
@@ -37,7 +51,7 @@ pool.connect(async (err, client, release) => {
 });
 
 // ----------------------------------------------------
-// MULTER CONFIGURATION FOR FILE UPLOADS
+// MULTER CONFIGURATION FOR FILE UPLOADS (Unchanged)
 // ----------------------------------------------------
 
 // Create a directory for uploads if it doesn't exist
@@ -52,7 +66,6 @@ const storage = multer.diskStorage({
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    // Generate a unique file name to avoid collisions
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
   }
@@ -61,262 +74,282 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // ----------------------------------------------------
-// GEOLOCATION UTILITY FUNCTIONS (Unchanged)
+// GEOLOCATION UTILITY FUNCTIONS (UPDATED FOR OPENCAGE)
 // ----------------------------------------------------
 
-// Helper function to add a delay
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
+/**
+ * Forward Geocoding: Converts location name to coordinates (lat/lng) using OpenCage.
+ */
 async function geocodeLocation(locationName) {
-    const appName = 'SandhaiCollegeProjectBackend'; 
-    const encodedLocation = encodeURIComponent(locationName);
-    const API_URL = `https://nominatim.openstreetmap.org/search?q=${encodedLocation}&format=json&limit=1`;
-
+    if (!OPENCAGE_API_KEY) return 'NULL';
     try {
-        const response = await fetch(API_URL, {
-            headers: { 'User-Agent': appName }
+        const response = await opencage.geocode({ 
+            q: locationName, 
+            key: OPENCAGE_API_KEY,
+            limit: 1, // Only need the best result
+            // bias: { countrycode: 'in' } // Optional: bias results towards India
         });
-        if (!response.ok) {
-            console.error(`Geocoding API request failed with status: ${response.status}`);
-            return 'NULL';
-        }
-        const data = await response.json();
-        if (data && data.length > 0) {
-            const lon = data[0].lon;
-            const lat = data[0].lat;
-            return `ST_GeogFromText('SRID=4326;POINT(${lon} ${lat})')`;
+        
+        if (response.status.code === 200 && response.results.length > 0) {
+            const { lat, lng } = response.results[0].geometry;
+            // PostGIS uses (Lng, Lat) for POINT construction
+            return `ST_GeogFromText('SRID=4326;POINT(${lng} ${lat})')`;
         } else {
-            console.warn(`No coordinates found for location: ${locationName}`);
+            const status = response.status.code;
+            console.warn(`Forward Geocode failed for location: ${locationName}. Status: ${status}`);
             return 'NULL';
         }
     } catch (error) {
-        console.error('Geocoding error:', error);
+        console.error('Forward Geocoding error (OpenCage):', error.message);
         return 'NULL';
     }
 }
 
 
-async function reverseGeocode(lat, lng, retries = 3) {
-  try {
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12&addressdetails=1`;
-    const response = await fetch(url, {
-      headers: { "User-Agent": "Sandhai Agri App/1.0 (sandhai.project.dev@gmail.com)" }
-    });
-    if (!response.ok) throw new Error(`Reverse geocode failed: ${response.status}`);
-    const data = await response.json();
-    const { city, town, village, state, country } = data.address || {};
-    return city || town || village
-      ? `${city || town || village}, ${state || ""}, ${country || ""}`
-      : data.display_name || "Unknown Location";
-  } catch (err) {
-    if (retries > 0 && (err.code === 'ECONNRESET' || err.type === 'system')) {
-        console.warn(`Reverse geocoding failed with ${err.code}, retrying... (${retries} attempts left)`);
-        await delay(1500); 
-        return reverseGeocode(lat, lng, retries - 1);
+/**
+ * Reverse Geocoding: Checks cache first, then calls OpenCage, and stores result.
+ */
+async function reverseGeocode(lat, lng) {
+    // 1. Create query string and point string for DB lookup
+    const query = `${lat}, ${lng}`;
+    // PostGIS stores GEOMETRY POINT as (lng, lat)
+    const pointString = `POINT(${lng} ${lat})`; 
+
+    // 2. CHECK CACHE
+    try {
+        const cacheResult = await pool.query(
+            `SELECT location_name FROM location_cache WHERE coords = ST_GeomFromText($1, 4326) LIMIT 1`,
+            [pointString]
+        );
+
+        if (cacheResult.rows.length > 0) {
+            // Cache HIT
+            return cacheResult.rows[0].location_name;
+        }
+    } catch (cacheError) {
+        console.error("Cache lookup error:", cacheError.message);
     }
-    console.error("Reverse geocoding error after all retries:", err);
-    return "Location lookup failed";
-  }
+
+    // 3. API CALL (Cache MISS)
+    if (!OPENCAGE_API_KEY) return "Location lookup failed (API Key Missing)";
+    
+    let locationName = "Location lookup failed";
+
+    try {
+        const response = await opencage.geocode({
+            q: query, // OpenCage accepts "lat, lng" in the query parameter
+            key: OPENCAGE_API_KEY,
+            limit: 1,
+            no_annotations: 1 // Keep the response cleaner
+        });
+
+        if (response.status.code === 200 && response.results.length > 0) {
+            locationName = response.results[0].formatted;
+            
+            // 4. STORE IN CACHE
+            await pool.query(
+                `INSERT INTO location_cache (coords, location_name) 
+                 VALUES (ST_GeomFromText($1, 4326), $2)
+                 ON CONFLICT (coords) DO NOTHING`, 
+                [pointString, locationName]
+            );
+        } else {
+            const status = response.status.code;
+            locationName = `No address found (Status: ${status})`;
+        }
+    } catch (err) {
+        console.error("Reverse geocoding error (OpenCage):", err.message);
+        locationName = "Location lookup failed";
+    }
+
+    return locationName;
 }
 
+/**
+ * Iterates through a list of items and adds a human-readable location name. (Unchanged logic)
+ */
 async function addLocationNames(items) {
-    const resultsWithLocations = [];
-    for (const item of items) {
+    const promises = items.map(async (item) => {
         if (item.lat && item.lng) {
             item.location_name = await reverseGeocode(item.lat, item.lng);
-            await delay(1000); 
         } else {
             item.location_name = "Location not specified";
         }
-        resultsWithLocations.push(item);
-    }
-    return resultsWithLocations;
+        return item;
+    });
+    
+    return Promise.all(promises);
 }
 
 
 // ----------------------------------------------------
-// USER AUTHENTICATION (Unchanged)
+// USER AUTHENTICATION (Unchanged API logic)
 // ----------------------------------------------------
 app.post('/api/signup', upload.single('profilePicture'), async (req, res) => {
-  const { username, email, password, phone_number, user_type, locationName } = req.body; 
-  try {
-    const salt = await bcrypt.genSalt(10);
-    const password_hash = await bcrypt.hash(password, salt);
-    const location_geog_sql = await geocodeLocation(locationName);
-    const profile_picture = req.file ? `/uploads/${req.file.filename}` : null;
-    const params = [username, email, password_hash, phone_number, user_type, profile_picture];
-    const newUser = await pool.query(
-      `INSERT INTO users (username, email, password_hash, phone_number, user_type, profile_picture, location) 
-       VALUES ($1, $2, $3, $4, $5, $6, ${location_geog_sql}) 
-       RETURNING user_id, username, email, user_type, location, profile_picture`,
-      params
-    );
-    res.status(201).json({ message: "User registered successfully!", user: newUser.rows[0] });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
-  }
+    const { username, email, password, phone_number, user_type, locationName } = req.body; 
+    try {
+        const salt = await bcrypt.genSalt(10);
+        const password_hash = await bcrypt.hash(password, salt);
+        const location_geog_sql = await geocodeLocation(locationName);
+        const profile_picture = req.file ? `/uploads/${req.file.filename}` : null;
+        const params = [username, email, password_hash, phone_number, user_type, profile_picture];
+        const newUser = await pool.query(
+          `INSERT INTO users (username, email, password_hash, phone_number, user_type, profile_picture, location) 
+           VALUES ($1, $2, $3, $4, $5, $6, ${location_geog_sql}) 
+           RETURNING user_id, username, email, user_type, location, profile_picture`,
+          params
+        );
+        res.status(201).json({ message: "User registered successfully!", user: newUser.rows[0] });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
 });
 
 app.post('/api/login', async (req, res) => {
-  const { email, password } = req.body;
-  try {
-    const user = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (user.rows.length === 0) {
-      return res.status(400).json({ message: "Invalid credentials" });
+    const { email, password } = req.body;
+    try {
+        const user = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        if (user.rows.length === 0) {
+          return res.status(400).json({ message: "Invalid credentials" });
+        }
+        const isMatch = await bcrypt.compare(password, user.rows[0].password_hash);
+        if (!isMatch) {
+          return res.status(400).json({ message: "Invalid credentials" });
+        }
+        const { password_hash, ...userData } = user.rows[0];
+        res.json({ message: "Login successful", user: userData });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
     }
-    const isMatch = await bcrypt.compare(password, user.rows[0].password_hash);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-    const { password_hash, ...userData } = user.rows[0];
-    res.json({ message: "Login successful", user: userData });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
-  }
 });
 
 app.get('/api/users/:userId/profile', async (req, res) => {
-  const { userId } = req.params;
-  try {
-    const result = await pool.query(
-      `SELECT user_id, username, email, phone_number, user_type, profile_picture,
-              ST_Y(location::geometry) AS lat,
-              ST_X(location::geometry) AS lng
-       FROM users WHERE user_id = $1`,
-      [userId]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ message: "User not found" });
-    let user = result.rows[0];
-    if (user.lat && user.lng) {
-      user.location_name = await reverseGeocode(user.lat, user.lng);
-    } else {
-      user.location_name = "Location not specified";
+    const { userId } = req.params;
+    try {
+        const result = await pool.query(
+          `SELECT user_id, username, email, phone_number, user_type, profile_picture,
+                  ST_Y(location::geometry) AS lat,
+                  ST_X(location::geometry) AS lng
+           FROM users WHERE user_id = $1`,
+          [userId]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ message: "User not found" });
+        let user = result.rows[0];
+        if (user.lat && user.lng) {
+          user.location_name = await reverseGeocode(user.lat, user.lng);
+        } else {
+          user.location_name = "Location not specified";
+        }
+        res.json(user);
+    } catch (err) {
+        console.error("Profile fetch error:", err);
+        res.status(500).send("Server error");
     }
-    res.json(user);
-  } catch (err) {
-    console.error("Profile fetch error:", err);
-    res.status(500).send("Server error");
-  }
 });
 
 // ----------------------------------------------------
-// PRODUCT MARKETPLACE (Unchanged)
+// PRODUCT MARKETPLACE (Unchanged API logic)
 // ----------------------------------------------------
 app.get('/api/products', async (req, res) => {
-  try {
-    const result = await pool.query(
-      `SELECT product_id, name, description, quantity, unit, price, images, seller_id, status, created_at,
-              ST_Y(location::geometry) AS lat,
-              ST_X(location::geometry) AS lng
-       FROM products WHERE status = 'available'`
-    );
-    const productsWithLocationNames = await addLocationNames(result.rows);
-    res.json(productsWithLocationNames);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
-  }
+    try {
+        const result = await pool.query(
+          `SELECT product_id, name, description, quantity, unit, price, images, seller_id, status, created_at,
+                  ST_Y(location::geometry) AS lat,
+                  ST_X(location::geometry) AS lng
+           FROM products WHERE status = 'available'`
+        );
+        const productsWithLocationNames = await addLocationNames(result.rows);
+        res.json(productsWithLocationNames);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
 });
 
 app.post('/api/products', upload.single('images'), async (req, res) => {
-  const { name, description, quantity, unit, price, seller_id, locationName } = req.body; 
-  try {
-    const location_geog_sql = await geocodeLocation(locationName);
-    const images_path = req.file ? [`/uploads/${req.file.filename}`] : [];
-    const params = [name, description, quantity, unit, price, images_path, seller_id];
-    const newProduct = await pool.query(
-      `INSERT INTO products (name, description, quantity, unit, price, images, seller_id, location) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, ${location_geog_sql}) 
-       RETURNING *`,
-      params
-    );
-    res.status(201).json(newProduct.rows[0]);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
-  }
+    const { name, description, quantity, unit, price, seller_id, locationName } = req.body; 
+    try {
+        const location_geog_sql = await geocodeLocation(locationName);
+        const images_path = req.file ? [`/uploads/${req.file.filename}`] : [];
+        const params = [name, description, quantity, unit, price, images_path, seller_id];
+        const newProduct = await pool.query(
+          `INSERT INTO products (name, description, quantity, unit, price, images, seller_id, location) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, ${location_geog_sql}) 
+           RETURNING *`,
+          params
+        );
+        res.status(201).json(newProduct.rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
 });
 
 // ----------------------------------------------------
-// FARM EQUIPMENT RENTAL (Updated)
+// FARM EQUIPMENT RENTAL (Unchanged API logic)
 // ----------------------------------------------------
 app.get('/api/rentals', async (req, res) => {
-  try {
-    const result = await pool.query(
-        `SELECT equipment_id, name, description, rental_rate, rate_unit, images, owner_id, availability_status, created_at, driver_option_available, driver_rate,
-                ST_Y(location::geometry) AS lat,
-                ST_X(location::geometry) AS lng
-         FROM farm_equipment 
-         -- REMOVE OR MODIFY THE FILTER: We will remove it to show all publicly listed items.
-         -- If you only want to exclude 'maintenance', use: WHERE availability_status != 'maintenance'
-         ORDER BY created_at DESC`
-    );
-
-    const rentalsWithLocationNames = await addLocationNames(result.rows);
-    res.json(rentalsWithLocationNames);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
-  }
+    try {
+        const result = await pool.query(
+            `SELECT equipment_id, name, description, rental_rate, rate_unit, images, owner_id, availability_status, created_at, driver_option_available, driver_rate,
+                    ST_Y(location::geometry) AS lat,
+                    ST_X(location::geometry) AS lng
+             FROM farm_equipment 
+             ORDER BY created_at DESC`
+        );
+        const rentalsWithLocationNames = await addLocationNames(result.rows);
+        res.json(rentalsWithLocationNames);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
 });
 
 app.post('/api/rentals', upload.single('images'), async (req, res) => {
-  const { 
-    name, 
-    description, 
-    rental_rate, 
-    rate_unit, 
-    owner_id, 
-    locationName,
-    driver_option_available,
-    driver_rate
-  } = req.body;
-  
-  const transformedRateUnit = rate_unit ? rate_unit.replace(' ', '_') : null;
+    const { name, description, rental_rate, rate_unit, owner_id, locationName, driver_option_available, driver_rate } = req.body;
+    const transformedRateUnit = rate_unit ? rate_unit.replace(' ', '_') : null;
 
-  try {
-    const location_geog_sql = await geocodeLocation(locationName);
-    const images_path = req.file ? [`/uploads/${req.file.filename}`] : [];
-    
-    const driverOption = driver_option_available || false;
-    const driverRateValue = driver_rate || 0.00;
+    try {
+        const location_geog_sql = await geocodeLocation(locationName);
+        const images_path = req.file ? [`/uploads/${req.file.filename}`] : [];
+        const driverOption = driver_option_available || false;
+        const driverRateValue = driver_rate || 0.00;
 
-    const params = [
-        name, 
-        description, 
-        rental_rate, 
-        transformedRateUnit,
-        images_path, 
-        owner_id,
-        driverOption,
-        driverRateValue
-    ];
+        const params = [
+            name, 
+            description, 
+            rental_rate, 
+            transformedRateUnit,
+            images_path, 
+            owner_id,
+            driverOption,
+            driverRateValue
+        ];
 
-    const queryText = `INSERT INTO farm_equipment 
-        (name, description, rental_rate, rate_unit, images, owner_id, driver_option_available, driver_rate, location) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, ${location_geog_sql}) 
-       RETURNING *`;
+        const queryText = `INSERT INTO farm_equipment 
+            (name, description, rental_rate, rate_unit, images, owner_id, driver_option_available, driver_rate, location) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, ${location_geog_sql}) 
+           RETURNING *`;
 
-    const newRental = await pool.query(queryText, params);
-    res.status(201).json(newRental.rows[0]);
+        const newRental = await pool.query(queryText, params);
+        res.status(201).json(newRental.rows[0]);
 
-  } catch (err) {
-    console.error("--- DATABASE ERROR ---");
-    console.error("Error Code:", err.code); 
-    console.error("Error Detail:", err.detail); 
-    console.error("Full Error:", err.message);
-    console.error("--- END DATABASE ERROR ---");
-    res.status(500).json({ 
-        message: 'Server error during database operation.',
-        error: err.message,
-        code: err.code 
-    });
-  }
+    } catch (err) {
+        console.error("--- DATABASE ERROR ---");
+        console.error("Error Code:", err.code); 
+        console.error("Error Detail:", err.detail); 
+        console.error("Full Error:", err.message);
+        console.error("--- END DATABASE ERROR ---");
+        res.status(500).json({ 
+            message: 'Server error during database operation.',
+            error: err.message,
+            code: err.code 
+        });
+    }
 });
 
-// ✅ MODIFIED: RENTAL BOOKING ROUTE to prevent self-booking
 app.post('/api/rentals/book', async (req, res) => {
     const { equipment_id, renter_id, start_date, end_date, total_price, driver_included } = req.body;
 
@@ -370,104 +403,103 @@ app.post('/api/rentals/book', async (req, res) => {
     }
 });
 
-
 // ----------------------------------------------------
-// CART (Unchanged)
+// CART (Unchanged API logic)
 // ----------------------------------------------------
 app.get('/api/users/:userId/cart', async (req, res) => {
-  const { userId } = req.params;
-  try {
-    const result = await pool.query(
-      `SELECT ci.cart_item_id, ci.quantity, p.product_id, p.name, p.price, p.unit, p.images, p.quantity AS stock,
-              ST_Y(p.location::geometry) AS lat,
-              ST_X(p.location::geometry) AS lng
-       FROM cartitems ci 
-       JOIN cart c ON ci.cart_id = c.cart_id 
-       JOIN products p ON ci.product_id = p.product_id 
-       WHERE c.user_id = $1`,
-      [userId]
-    );
-    const cartItemsWithLocationNames = await addLocationNames(result.rows);
-    res.json(cartItemsWithLocationNames);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
-  }
+    const { userId } = req.params;
+    try {
+        const result = await pool.query(
+          `SELECT ci.cart_item_id, ci.quantity, p.product_id, p.name, p.price, p.unit, p.images, p.quantity AS stock,
+                  ST_Y(p.location::geometry) AS lat,
+                  ST_X(p.location::geometry) AS lng
+           FROM cartitems ci 
+           JOIN cart c ON ci.cart_id = c.cart_id 
+           JOIN products p ON ci.product_id = p.product_id 
+           WHERE c.user_id = $1`,
+          [userId]
+        );
+        const cartItemsWithLocationNames = await addLocationNames(result.rows);
+        res.json(cartItemsWithLocationNames);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
 });
 
 app.post('/api/users/:userId/cart/add', async (req, res) => {
-  const { userId } = req.params;
-  const { productId, quantity } = req.body;
-  if (!productId || !quantity || quantity < 1 || !userId || isNaN(parseInt(userId))) {
-      return res.status(400).json({ message: "Invalid request: User ID must be a valid number, and product details must be provided." });
-  }
-  const numericUserId = parseInt(userId);
-  try {
-    let cart = await pool.query('SELECT cart_id FROM cart WHERE user_id = $1', [numericUserId]);
-    let cartId;
-    if (cart.rows.length === 0) {
-      const newCart = await pool.query('INSERT INTO cart (user_id) VALUES ($1) RETURNING cart_id', [numericUserId]);
-      cartId = newCart.rows[0].cart_id;
-    } else {
-      cartId = cart.rows[0].cart_id;
+    const { userId } = req.params;
+    const { productId, quantity } = req.body;
+    if (!productId || !quantity || quantity < 1 || !userId || isNaN(parseInt(userId))) {
+        return res.status(400).json({ message: "Invalid request: User ID must be a valid number, and product details must be provided." });
     }
-    const cartItem = await pool.query(
-      'INSERT INTO cartitems (cart_id, product_id, quantity) VALUES ($1, $2, $3) ON CONFLICT (cart_id, product_id) DO UPDATE SET quantity = cartitems.quantity + $3 RETURNING *',
-      [cartId, productId, quantity]
-    );
-    res.status(201).json(cartItem.rows[0]);
-  } catch (err) {
-    console.error("Add to cart error:", err.message);
-    res.status(500).send('Server error');
-  }
+    const numericUserId = parseInt(userId);
+    try {
+      let cart = await pool.query('SELECT cart_id FROM cart WHERE user_id = $1', [numericUserId]);
+      let cartId;
+      if (cart.rows.length === 0) {
+        const newCart = await pool.query('INSERT INTO cart (user_id) VALUES ($1) RETURNING cart_id', [numericUserId]);
+        cartId = newCart.rows[0].cart_id;
+      } else {
+        cartId = cart.rows[0].cart_id;
+      }
+      const cartItem = await pool.query(
+        'INSERT INTO cartitems (cart_id, product_id, quantity) VALUES ($1, $2, $3) ON CONFLICT (cart_id, product_id) DO UPDATE SET quantity = cartitems.quantity + $3 RETURNING *',
+        [cartId, productId, quantity]
+      );
+      res.status(201).json(cartItem.rows[0]);
+    } catch (err) {
+      console.error("Add to cart error:", err.message);
+      res.status(500).send('Server error');
+    }
 });
 
 app.put('/api/users/:userId/cart/update/:productId', async (req, res) => {
-  const { userId, productId } = req.params;
-  const { quantity } = req.body;
-  
-  if (!quantity || quantity < 0 || isNaN(parseInt(quantity))) {
-    return res.status(400).json({ message: "Invalid quantity provided." });
-  }
-
-  try {
-    const result = await pool.query(
-      'UPDATE cartitems SET quantity = $1 WHERE product_id = $2 AND cart_id IN (SELECT cart_id FROM cart WHERE user_id = $3) RETURNING *',
-      [quantity, productId, userId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: "Cart item not found or user not authorized." });
+    const { userId, productId } = req.params;
+    const { quantity } = req.body;
+    
+    if (!quantity || quantity < 0 || isNaN(parseInt(quantity))) {
+      return res.status(400).json({ message: "Invalid quantity provided." });
     }
 
-    res.json(result.rows[0]);
-  } catch (err) {
-    console.error("Error updating cart quantity:", err.message);
-    res.status(500).send('Server error');
-  }
+    try {
+      const result = await pool.query(
+        'UPDATE cartitems SET quantity = $1 WHERE product_id = $2 AND cart_id IN (SELECT cart_id FROM cart WHERE user_id = $3) RETURNING *',
+        [quantity, productId, userId]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ message: "Cart item not found or user not authorized." });
+      }
+
+      res.json(result.rows[0]);
+    } catch (err) {
+      console.error("Error updating cart quantity:", err.message);
+      res.status(500).send('Server error');
+    }
 });
 
 app.delete('/api/users/:userId/cart/remove/:productId', async (req, res) => {
-  const { userId, productId } = req.params;
-  try {
-    const result = await pool.query(
-      'DELETE FROM cartitems WHERE product_id = $1 AND cart_id IN (SELECT cart_id FROM cart WHERE user_id = $2)',
-      [productId, userId]
-    );
-    
-    if (result.rowCount === 0) {
-        return res.status(404).json({ message: "Item not found in cart." });
+    const { userId, productId } = req.params;
+    try {
+      const result = await pool.query(
+        'DELETE FROM cartitems WHERE product_id = $1 AND cart_id IN (SELECT cart_id FROM cart WHERE user_id = $2)',
+        [productId, userId]
+      );
+      
+      if (result.rowCount === 0) {
+          return res.status(404).json({ message: "Item not found in cart." });
+      }
+
+      res.status(204).send(); 
+    } catch (err)
+      {
+      console.error("Error removing item from cart:", err.message);
+      res.status(500).send('Server error');
     }
-
-    res.status(204).send(); 
-  } catch (err)
-    {
-    console.error("Error removing item from cart:", err.message);
-    res.status(500).send('Server error');
-  }
 });
-
-
+  
+  
 // ORDER CREATION (Unchanged)
 app.post('/api/orders/create', async (req, res) => {
     const { buyer_id, total_price, cartItems } = req.body;
@@ -549,9 +581,9 @@ app.post('/api/orders/create', async (req, res) => {
         client.release();
     }
 });
-
+  
 // ----------------------------------------------------
-// OWNER-SPECIFIC ROUTES (Updated)
+// OWNER-SPECIFIC ROUTES (Unchanged)
 // ----------------------------------------------------
 app.get('/api/users/:userId/equipment', async (req, res) => {
     const { userId } = req.params;
@@ -568,7 +600,6 @@ app.get('/api/users/:userId/equipment', async (req, res) => {
 });
 
 
-// ✅ MODIFIED: Allows owner to change status even if it is 'rented'.
 app.put('/api/equipment/:equipmentId/status', async (req, res) => {
     const { equipmentId } = req.params;
     const { status, ownerId } = req.body; 
@@ -583,7 +614,6 @@ app.put('/api/equipment/:equipmentId/status', async (req, res) => {
     }
 
     try {
-        // Updated query: removed the 'AND availability_status != 'rented'' check.
         const result = await pool.query(
             `UPDATE farm_equipment 
              SET availability_status = $1 
@@ -594,7 +624,6 @@ app.put('/api/equipment/:equipmentId/status', async (req, res) => {
         );
 
         if (result.rows.length === 0) {
-            // Check if the equipment exists and belongs to the user
             const checkOwner = await pool.query(
                 `SELECT owner_id FROM farm_equipment WHERE equipment_id = $1`,
                 [equipmentId]
@@ -604,7 +633,6 @@ app.put('/api/equipment/:equipmentId/status', async (req, res) => {
                 return res.status(404).json({ message: "Equipment not found." });
             }
             
-            // Fix for 500 Error: Robustly compare the owner ID (owner_id from DB is number, ownerId from req is string)
             if (checkOwner.rows[0].owner_id !== parseInt(ownerId)) { 
                 return res.status(403).json({ message: "You are not authorized to modify this equipment." });
             }
@@ -691,18 +719,38 @@ app.put('/api/bookings/:bookingId/complete', async (req, res) => {
 
 app.put('/api/bookings/:bookingId/return', async (req, res) => {
     const { bookingId } = req.params;
+
+    const client = await pool.connect();
     try {
-        const result = await pool.query(
-            `UPDATE rentalbookings SET status = 'returned' WHERE booking_id = $1 RETURNING *`,
+        await client.query('BEGIN');
+
+        // 1. Update the booking status to 'returned'
+        const result = await client.query(
+            `UPDATE rentalbookings 
+             SET status = 'returned' 
+             WHERE booking_id = $1 
+             RETURNING equipment_id, renter_id, status`,
             [bookingId]
         );
+
         if (result.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ message: "Booking not found." });
         }
-        res.json({ message: 'Booking marked as returned.', booking: result.rows[0] });
+        
+        await client.query('COMMIT');
+
+        res.json({ 
+            message: 'Booking marked as returned. The equipment owner must now check the item and manually mark it available on their dashboard.', 
+            booking: result.rows[0] 
+        });
+
     } catch (err) {
+        await client.query('ROLLBACK');
         console.error("Error returning booking:", err);
         res.status(500).json({ message: "Failed to return booking." });
+    } finally {
+        client.release();
     }
 });
 
