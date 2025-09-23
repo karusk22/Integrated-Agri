@@ -8,9 +8,9 @@ const AddProduct = ({ onAddProduct, user }) => { // ⬅️ Passed onAddProduct a
   const [product, setProduct] = useState({
     name: '',
     description: '',
-    locationName: '', // Changed to locationName to match backend
+    locationName: '', 
     quantity: '',
-    unit: 'kg', // Added unit selection
+    unit: 'kg',
     price: '',
     images: null,
   });
@@ -34,7 +34,12 @@ const AddProduct = ({ onAddProduct, user }) => { // ⬅️ Passed onAddProduct a
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    // 🛑 CRITICAL: This stops the browser's default form submission
+    e.preventDefault(); 
+    
+    // If the browser submits the form, this code isn't run, 
+    // and the request happens outside of your Fetch API call (without the image file, but with other fields).
+
     setLoading(true);
     setMessage('');
 
@@ -53,6 +58,8 @@ const AddProduct = ({ onAddProduct, user }) => { // ⬅️ Passed onAddProduct a
     dataToSubmit.append('seller_id', user.user_id);
     dataToSubmit.append('locationName', product.locationName);
     
+    // The browser only attaches files if the form is submitted natively.
+    // We must manually attach the file here for the Fetch API request.
     if (product.images) {
       dataToSubmit.append('images', product.images);
     }
@@ -79,6 +86,10 @@ const AddProduct = ({ onAddProduct, user }) => { // ⬅️ Passed onAddProduct a
           price: '',
           images: null,
         });
+        
+        // Optionally redirect after success
+        setTimeout(() => navigate('/products'), 1500);
+
       } else {
         setMessage(result.message || 'Failed to add product. Please check your data.');
       }
@@ -105,8 +116,9 @@ const AddProduct = ({ onAddProduct, user }) => { // ⬅️ Passed onAddProduct a
               Fill in the details below to list your agricultural by-product on AgriBazar.
             </p>
           </header>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
+          
+          {/* ✅ CRITICAL: Ensure all inputs are correctly wrapped by this explicit <form> tag */}
+          <form onSubmit={handleSubmit} className="space-y-6"> 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Product Name */}
               <div className="relative">
@@ -240,9 +252,9 @@ const AddProduct = ({ onAddProduct, user }) => { // ⬅️ Passed onAddProduct a
                 {loading ? 'Adding...' : 'Add Product'}
               </button>
               <button
-                type="button"
+                // This is already correct, but ensure it's not accidentally type="submit"
+                type="button" 
                 className="w-full sm:w-auto bg-white text-emerald-600 px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl border-2 border-emerald-200 hover:border-emerald-300 transform hover:scale-105 transition-all duration-300"
-                // 🚀 FIXED: Navigate back to the previous page
                 onClick={() => navigate(-1)}
               >
                 Cancel

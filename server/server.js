@@ -6,7 +6,6 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-// const { Client: GoogleClient, GeocodeResponseStatus } = require("@googlemaps/google-maps-services-js"); // REMOVED
 
 // 🔑 NEW IMPORT: OpenCage API Client
 const opencage = require('opencage-api-client');
@@ -50,9 +49,9 @@ pool.connect(async (err, client, release) => {
   release();
 });
 
-// ----------------------------------------------------
-// MULTER CONFIGURATION FOR FILE UPLOADS (Unchanged)
-// ----------------------------------------------------
+// -------------------------------------
+// MULTER CONFIGURATION FOR FILE UPLOADS 
+// -------------------------------------
 
 // Create a directory for uploads if it doesn't exist
 const uploadsDir = path.join(__dirname, 'public/uploads');
@@ -74,7 +73,7 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 // ----------------------------------------------------
-// GEOLOCATION UTILITY FUNCTIONS (UPDATED FOR OPENCAGE)
+// GEOLOCATION UTILITY FUNCTIONS (OpenCage + CACHING)
 // ----------------------------------------------------
 
 /**
@@ -86,8 +85,7 @@ async function geocodeLocation(locationName) {
         const response = await opencage.geocode({ 
             q: locationName, 
             key: OPENCAGE_API_KEY,
-            limit: 1, // Only need the best result
-            // bias: { countrycode: 'in' } // Optional: bias results towards India
+            limit: 1, 
         });
         
         if (response.status.code === 200 && response.results.length > 0) {
@@ -110,9 +108,7 @@ async function geocodeLocation(locationName) {
  * Reverse Geocoding: Checks cache first, then calls OpenCage, and stores result.
  */
 async function reverseGeocode(lat, lng) {
-    // 1. Create query string and point string for DB lookup
     const query = `${lat}, ${lng}`;
-    // PostGIS stores GEOMETRY POINT as (lng, lat)
     const pointString = `POINT(${lng} ${lat})`; 
 
     // 2. CHECK CACHE
@@ -137,10 +133,10 @@ async function reverseGeocode(lat, lng) {
 
     try {
         const response = await opencage.geocode({
-            q: query, // OpenCage accepts "lat, lng" in the query parameter
+            q: query, 
             key: OPENCAGE_API_KEY,
             limit: 1,
-            no_annotations: 1 // Keep the response cleaner
+            no_annotations: 1 
         });
 
         if (response.status.code === 200 && response.results.length > 0) {
@@ -166,7 +162,7 @@ async function reverseGeocode(lat, lng) {
 }
 
 /**
- * Iterates through a list of items and adds a human-readable location name. (Unchanged logic)
+ * Iterates through a list of items and adds a human-readable location name.
  */
 async function addLocationNames(items) {
     const promises = items.map(async (item) => {
@@ -183,7 +179,7 @@ async function addLocationNames(items) {
 
 
 // ----------------------------------------------------
-// USER AUTHENTICATION (Unchanged API logic)
+// USER AUTHENTICATION 
 // ----------------------------------------------------
 app.post('/api/signup', upload.single('profilePicture'), async (req, res) => {
     const { username, email, password, phone_number, user_type, locationName } = req.body; 
@@ -250,7 +246,7 @@ app.get('/api/users/:userId/profile', async (req, res) => {
 });
 
 // ----------------------------------------------------
-// PRODUCT MARKETPLACE (Unchanged API logic)
+// PRODUCT MARKETPLACE (Unchanged logic)
 // ----------------------------------------------------
 app.get('/api/products', async (req, res) => {
     try {
@@ -288,7 +284,7 @@ app.post('/api/products', upload.single('images'), async (req, res) => {
 });
 
 // ----------------------------------------------------
-// FARM EQUIPMENT RENTAL (Unchanged API logic)
+// FARM EQUIPMENT RENTAL (Unchanged logic)
 // ----------------------------------------------------
 app.get('/api/rentals', async (req, res) => {
     try {
@@ -340,8 +336,6 @@ app.post('/api/rentals', upload.single('images'), async (req, res) => {
         console.error("--- DATABASE ERROR ---");
         console.error("Error Code:", err.code); 
         console.error("Error Detail:", err.detail); 
-        console.error("Full Error:", err.message);
-        console.error("--- END DATABASE ERROR ---");
         res.status(500).json({ 
             message: 'Server error during database operation.',
             error: err.message,
@@ -404,7 +398,7 @@ app.post('/api/rentals/book', async (req, res) => {
 });
 
 // ----------------------------------------------------
-// CART (Unchanged API logic)
+// CART (Unchanged logic)
 // ----------------------------------------------------
 app.get('/api/users/:userId/cart', async (req, res) => {
     const { userId } = req.params;
@@ -674,7 +668,210 @@ app.get('/api/owners/:ownerId/bookings', async (req, res) => {
 });
 
 // ----------------------------------------------------
-// FARMER-SPECIFIC RENTAL HISTORY & REVIEW ROUTES (Unchanged)
+// SALES & ORDER MANAGEMENT (Updated with Status Fix)
+// ----------------------------------------------------
+
+// Endpoint for Seller/Owner to Mark Order as Shipped
+app.put('/api/orders/:orderId/ship', async (req, res) => {
+    const { orderId } = req.params;
+    const { sellerId } = req.body; 
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Verify seller owns at least one product in this order
+        const verificationQuery = `
+            SELECT 1 FROM orderitems oi 
+            JOIN products p ON oi.product_id = p.product_id 
+            WHERE oi.order_id = $1 AND p.seller_id = $2
+        `;
+        const verificationResult = await client.query(verificationQuery, [orderId, sellerId]);
+
+        if (verificationResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(403).json({ message: "Unauthorized: You are not the seller for this order." });
+        }
+
+        // 2. Update the order status from 'pending' to 'shipped'
+        const updateQuery = `
+            UPDATE orders SET status = 'shipped'
+            WHERE order_id = $1 AND status = 'pending'
+            RETURNING *;
+        `;
+        const result = await client.query(updateQuery, [orderId]);
+
+        if (result.rows.length === 0) {
+             await client.query('ROLLBACK');
+             return res.status(409).json({ message: "Order must be in 'pending' status to be marked as shipped." });
+        }
+
+        await client.query('COMMIT');
+        res.json({ message: "Order marked as shipped successfully.", order: result.rows[0] });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("Error marking order as shipped:", err);
+        res.status(500).json({ message: "Server error during shipping update." });
+    } finally {
+        client.release();
+    }
+});
+
+// ✅ FIXED: Endpoint for Buyer to Mark as Completed/Delivered (Status changed to 'completed')
+app.put('/api/orders/:orderId/complete-delivery', async (req, res) => {
+    const { orderId } = req.params;
+    const { buyerId } = req.body; 
+    
+    // We will use 'completed' as the final status to align with common database patterns.
+    const finalStatus = 'completed'; 
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Update the order status from 'shipped' to 'completed'
+        const updateQuery = `
+            UPDATE orders SET status = $3
+            WHERE order_id = $1 AND buyer_id = $2 AND status = 'shipped'
+            RETURNING *;
+        `;
+        const result = await client.query(updateQuery, [orderId, buyerId, finalStatus]);
+
+        if (result.rows.length === 0) {
+             await client.query('ROLLBACK');
+             return res.status(409).json({ message: "Order must be in 'shipped' status and belong to the buyer to be confirmed." });
+        }
+
+        await client.query('COMMIT');
+        res.json({ message: `Delivery confirmed and order marked as ${finalStatus}.`, order: result.rows[0] });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("Error completing delivery:", err);
+        // The detailed error is now visible in the console if the status string itself is incorrect
+        res.status(500).json({ message: "Server error during delivery confirmation." });
+    } finally {
+        client.release();
+    }
+});
+
+
+// Endpoint for Fetching Product Order History (Buyer)
+app.get('/api/users/:userId/orders', async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const query = `
+            SELECT 
+                o.order_id,
+                o.total_price,
+                o.status AS order_status,
+                o.created_at AS order_date,
+                oi.quantity AS item_quantity,
+                oi.line_item_price,
+                p.product_id,
+                p.name AS product_name,
+                p.price AS unit_price,
+                p.unit AS product_unit
+            FROM orders o
+            JOIN orderitems oi ON o.order_id = oi.order_id
+            JOIN products p ON oi.product_id = p.product_id
+            WHERE o.buyer_id = $1
+            ORDER BY o.created_at DESC;
+        `;
+        const { rows } = await pool.query(query, [userId]);
+
+        const ordersHistory = rows.reduce((acc, row) => {
+            const existingOrder = acc.find(order => order.order_id === row.order_id);
+            const itemDetail = {
+                product_id: row.product_id,
+                name: row.product_name,
+                quantity: row.item_quantity,
+                unit_price: row.unit_price,
+                line_item_price: row.line_item_price,
+                unit: row.product_unit
+            };
+
+            if (existingOrder) {
+                existingOrder.items.push(itemDetail);
+            } else {
+                acc.push({
+                    order_id: row.order_id,
+                    total_price: row.total_price,
+                    status: row.order_status,
+                    order_date: row.order_date,
+                    items: [itemDetail]
+                });
+            }
+            return acc;
+        }, []);
+
+        res.json(ordersHistory);
+    } catch (err) {
+        console.error("Error fetching product orders:", err);
+        res.status(500).json({ message: "Failed to fetch product order history." });
+    }
+});
+
+// Endpoint for Fetching Product Sales History (Seller/Owner)
+app.get('/api/users/:userId/sales', async (req, res) => {
+    const { userId } = req.params;
+    try {
+        const query = `
+            SELECT 
+                o.order_id,
+                o.created_at AS order_date,
+                o.status AS order_status,
+                u.username AS buyer_name,
+                oi.quantity AS item_quantity,
+                oi.line_item_price,
+                p.name AS product_name,
+                p.unit AS product_unit
+            FROM orders o
+            JOIN orderitems oi ON o.order_id = oi.order_id
+            JOIN products p ON oi.product_id = p.product_id
+            JOIN users u ON o.buyer_id = u.user_id
+            WHERE p.seller_id = $1
+            ORDER BY o.created_at DESC, o.order_id;
+        `;
+        const { rows } = await pool.query(query, [userId]);
+
+        const salesHistory = rows.reduce((acc, row) => {
+            const existingOrder = acc.find(order => order.order_id === row.order_id);
+            const itemDetail = {
+                product_name: row.product_name,
+                quantity: row.item_quantity,
+                unit: row.product_unit,
+                line_item_price: row.line_item_price,
+            };
+            const itemTotal = parseFloat(row.line_item_price);
+
+            if (existingOrder) {
+                existingOrder.items.push(itemDetail);
+                existingOrder.total_revenue += itemTotal;
+            } else {
+                acc.push({
+                    order_id: row.order_id,
+                    buyer_name: row.buyer_name,
+                    status: row.order_status,
+                    order_date: row.order_date,
+                    total_revenue: itemTotal, 
+                    items: [itemDetail]
+                });
+            }
+            return acc;
+        }, []);
+
+        res.json(salesHistory);
+    } catch (err) {
+        console.error("Error fetching product sales:", err);
+        res.status(500).json({ message: "Failed to fetch product sales history." });
+    }
+});
+
+
+// ----------------------------------------------------
+// RENTAL BOOKING/REVIEW ROUTES (Unchanged)
 // ----------------------------------------------------
 app.get('/api/renters/:renterId/bookings', async (req, res) => {
     const { renterId } = req.params;
