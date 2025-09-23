@@ -195,7 +195,7 @@ const RentalPage = ({ rentals: propRentals }) => {
     };
 
     // Determine if the user is an equipment owner
-    // Assuming the user_type from your backend is 'equipment_owner'
+    // Assuming the user_type from your backend is 'owner'
     const isEquipmentOwner = user && user.user_type === 'owner';
 
     const handleListMachineClick = () => {
@@ -209,12 +209,32 @@ const RentalPage = ({ rentals: propRentals }) => {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header and Search UI */}
-            <div className="relative z-10 p-8">
-                <header className="text-center mb-16">
+            <div className="relative z-10 p-4 sm:p-8">
+                <header className="text-center mb-10">
                      <div className="mb-6"><div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl shadow-2xl mb-6"><CalendarDays size={32} className="text-white"/></div></div>
                     <h1 className="text-5xl md:text-7xl font-black bg-gradient-to-r from-emerald-600 to-cyan-600 bg-clip-text text-transparent">Sandhai Rentals</h1>
                     <p className="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto">Rent the right farm equipment for your needs.</p>
                 </header>
+                
+                {/* Stats Section - ADDED HERE */}
+                <div className="flex justify-center gap-6 sm:gap-12 mb-12 max-w-3xl mx-auto">
+                    <div className="text-center">
+                        <div className="text-3xl font-bold text-emerald-600">
+                             {rentals.length}+ {/* Using actual rental count */}
+                        </div>
+                        <div className="text-sm text-gray-500">Equipment Listings</div>
+                    </div>
+                    <div className="text-center">
+                        <div className="text-3xl font-bold text-teal-600">100+</div>
+                        <div className="text-sm text-gray-500">Farmers Served</div>
+                    </div>
+                    <div className="text-center">
+                        <div className="text-3xl font-bold text-cyan-600">50+</div>
+                        <div className="text-sm text-gray-500">Districts Covered</div>
+                    </div>
+                </div>
+                {/* End Stats Section */}
+
                 
                 <main className="max-w-7xl mx-auto">
                     {/* Optional Search Bar
